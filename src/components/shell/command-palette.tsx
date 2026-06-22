@@ -7,12 +7,12 @@ import { useApp } from "@/lib/context";
 import { useEntitySearch, SEARCH_TYPE_LABELS } from "@/lib/use-entity-search";
 import {
   Home, Search, Loader2, UtensilsCrossed, LayoutGrid, Package, Receipt, CreditCard,
-  Users, BarChart3, Gift, Plug, Settings, Shield,
+  Users, BarChart3, Gift, Plug, Settings, Shield, Sparkles,
 } from "lucide-react";
 
 const ICONS: Record<string, React.ElementType> = {
   Home, UtensilsCrossed, LayoutGrid, Package, Receipt, CreditCard,
-  Users, BarChart3, Gift, Plug, Settings, Shield,
+  Users, BarChart3, Gift, Plug, Settings, Shield, Sparkles,
 };
 
 const COMMANDS = [

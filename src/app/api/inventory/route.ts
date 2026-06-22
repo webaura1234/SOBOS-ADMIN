@@ -25,17 +25,25 @@ export async function GET(req: NextRequest) {
   }
 
   if (tab === "suppliers") {
-    const suppliers = await prisma.supplier.findMany({ orderBy: { name: "asc" } });
-    return NextResponse.json({ suppliers });
+    const [suppliers, ingredients] = await Promise.all([
+      prisma.supplier.findMany({ orderBy: { name: "asc" } }),
+      prisma.ingredient.findMany({ orderBy: { name: "asc" } }),
+    ]);
+    return NextResponse.json({ suppliers, ingredients });
   }
 
   if (tab === "pos") {
-    const pos = await prisma.purchaseOrder.findMany({
-      where: locationId ? { locationId } : {},
-      include: { supplier: true, lines: { include: { ingredient: true } } },
-      orderBy: { createdAt: "desc" },
-    });
-    return NextResponse.json({ purchaseOrders: pos });
+    const [pos, suppliers, ingredients, locations] = await Promise.all([
+      prisma.purchaseOrder.findMany({
+        where: locationId ? { locationId } : {},
+        include: { supplier: true, lines: { include: { ingredient: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.supplier.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+      prisma.ingredient.findMany({ orderBy: { name: "asc" } }),
+      prisma.location.findMany({ where: { status: "active" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    ]);
+    return NextResponse.json({ purchaseOrders: pos, suppliers, ingredients, locations });
   }
 
   const stock = await prisma.stock.findMany({
@@ -65,6 +73,23 @@ export async function PATCH(req: NextRequest) {
       const supplier = await prisma.supplier.update({ where: { id: body.id }, data: body.data });
       await audit("update", "supplier", body.id, body.data);
       return NextResponse.json(supplier);
+    }
+    if (body.type === "receive_po") {
+      const po = await prisma.purchaseOrder.findUnique({ where: { id: body.id }, include: { lines: true } });
+      if (!po) return NextResponse.json({ error: "PO not found" }, { status: 404 });
+      await prisma.$transaction(async (tx) => {
+        for (const line of po.lines) {
+          await tx.purchaseOrderLine.update({ where: { id: line.id }, data: { qtyReceived: line.qtyOrdered } });
+          await tx.stock.upsert({
+            where: { ingredientId_locationId: { ingredientId: line.ingredientId, locationId: po.locationId } },
+            update: { quantity: { increment: line.qtyOrdered }, lastRestocked: new Date() },
+            create: { ingredientId: line.ingredientId, locationId: po.locationId, quantity: line.qtyOrdered, lastRestocked: new Date() },
+          });
+        }
+        await tx.purchaseOrder.update({ where: { id: po.id }, data: { status: "received" } });
+      });
+      await audit("receive", "purchase_order", body.id, po);
+      return NextResponse.json({ ok: true });
     }
     return NextResponse.json({ error: "Unknown type" }, { status: 400 });
   } catch (e) {

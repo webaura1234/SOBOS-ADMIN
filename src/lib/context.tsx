@@ -19,8 +19,14 @@ interface AppContextValue {
   locations: { id: string; name: string }[];
   setLocations: (locs: { id: string; name: string }[]) => void;
   userRole: UserRole;
+  setUserRole: (role: UserRole) => void;
   userName: string;
+  setUserName: (name: string) => void;
   restaurantName: string;
+  setRestaurantName: (name: string) => void;
+  permissions: string[];
+  setPermissions: (permissions: string[]) => void;
+  hasPermission: (permission: string) => boolean;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
   mobileMenuOpen: boolean;
@@ -38,7 +44,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [density, setDensityState] = useState<Density>("comfortable");
+  const [density, setDensityState] = useState<Density>("compact");
   const [locationId, setLocationId] = useState<string | null>(null);
   const [locations, setLocations] = useState<{ id: string; name: string }[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -47,6 +53,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [opsSummary, setOpsSummary] = useState<{ activeOrders: number; lowStockCount: number } | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>("owner");
+  const [userName, setUserName] = useState("Admin");
+  const [restaurantName, setRestaurantName] = useState("Restaurant");
+  const [permissions, setPermissions] = useState<string[]>([]);
 
   const setDensity = useCallback((d: Density) => {
     setDensityState(d);
@@ -86,6 +96,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const hasPermission = useCallback(
+    (permission: string) => userRole === "owner" || permissions.includes(permission),
+    [permissions, userRole]
+  );
+
   return (
     <AppContext.Provider
       value={{
@@ -95,9 +110,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setLocationId,
         locations,
         setLocations,
-        userRole: "owner",
-        userName: "Rajesh Kumar",
-        restaurantName: "Spice Garden",
+        userRole,
+        setUserRole,
+        userName,
+        setUserName,
+        restaurantName,
+        setRestaurantName,
+        permissions,
+        setPermissions,
+        hasPermission,
         sidebarCollapsed,
         setSidebarCollapsed,
         mobileMenuOpen,

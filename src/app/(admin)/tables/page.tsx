@@ -7,7 +7,7 @@ import { ConfirmDialog, FormField, inputClass, selectClass } from "@/components/
 import { formatCurrency, cn, naturalSortLabel } from "@/lib/utils";
 import { apiFetch, useToast } from "@/lib/toast";
 import { useApp } from "@/lib/context";
-import { Plus, Save, Trash2, QrCode, Users } from "lucide-react";
+import { Download, Plus, Save, Trash2, QrCode, RefreshCw, Users } from "lucide-react";
 
 interface TableRow {
   id: string;
@@ -20,7 +20,7 @@ interface TableRow {
   posX: number;
   posY: number;
   qrCode: string | null;
-  sessions: { guestCount: number; serverName: string | null; orderTotal: number }[];
+  sessions: { id: string; guestCount: number; serverName: string | null; orderTotal: number }[];
 }
 
 interface Section { id: string; name: string; _count: { tables: number } }
@@ -49,7 +49,8 @@ export default function TablesPage() {
   const [detail, setDetail] = useState<TableRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [statusFilter, setStatusFilter] = useState("");
-  const [form, setForm] = useState({ label: "", minCapacity: 2, maxCapacity: 4, shape: "square", sectionId: "", status: "available" });
+  const [form, setForm] = useState({ label: "", minCapacity: 2, maxCapacity: 4, shape: "square", sectionId: "", status: "available", posX: 0, posY: 0 });
+  const [sessionForm, setSessionForm] = useState({ guestCount: 2, serverName: "" });
   const [newSection, setNewSection] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const locId = locationId ?? locations[0]?.id ?? "";
@@ -96,9 +97,9 @@ export default function TablesPage() {
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
   };
 
-  const deleteTable = async (id: string) => {
+  const deleteTable = async (id: string, reason?: string) => {
     try {
-      await apiFetch(`/api/tables?id=${id}`, { method: "DELETE" });
+      await apiFetch(`/api/tables?id=${id}&reason=${encodeURIComponent(reason ?? "No reason provided")}`, { method: "DELETE" });
       toast("Table deleted"); setDetail(null); load();
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
   };
@@ -113,12 +114,52 @@ export default function TablesPage() {
 
   const openCreate = () => {
     setCreating(true); setDetail(null);
-    setForm({ label: "", minCapacity: 2, maxCapacity: 4, shape: "square", sectionId: "", status: "available" });
+    setForm({ label: "", minCapacity: 2, maxCapacity: 4, shape: "square", sectionId: "", status: "available", posX: 0, posY: 0 });
   };
 
   const openEdit = (t: TableRow) => {
     setCreating(false); setDetail(t);
-    setForm({ label: t.label, minCapacity: t.minCapacity, maxCapacity: t.maxCapacity, shape: t.shape, sectionId: t.section?.id ?? "", status: t.status });
+    setForm({ label: t.label, minCapacity: t.minCapacity, maxCapacity: t.maxCapacity, shape: t.shape, sectionId: t.section?.id ?? "", status: t.status, posX: t.posX, posY: t.posY });
+  };
+
+  const openSession = async () => {
+    if (!detail) return;
+    try {
+      await apiFetch("/api/tables", { method: "POST", body: JSON.stringify({ type: "session", tableId: detail.id, ...sessionForm }) });
+      toast("Table session opened");
+      setDetail(null);
+      load();
+    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+
+  const closeSession = async () => {
+    const session = detail?.sessions[0];
+    if (!session || !detail) return;
+    try {
+      await apiFetch("/api/tables", { method: "PATCH", body: JSON.stringify({ type: "close_session", id: session.id, tableId: detail.id }) });
+      toast("Table session closed");
+      setDetail(null);
+      load();
+    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+
+  const regenerateQr = async (tableId: string) => {
+    try {
+      await apiFetch("/api/tables", { method: "PATCH", body: JSON.stringify({ type: "qr", id: tableId }) });
+      toast("QR regenerated");
+      load();
+    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+
+  const downloadQrs = () => {
+    const content = sortedTables.map((t) => `${t.label},${t.qrCode ?? `QR-${t.label}`}`).join("\n");
+    const blob = new Blob([`Table,QRCode\n${content}`], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "table-qr-codes.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const columns: Column<TableRow>[] = [
@@ -152,7 +193,7 @@ export default function TablesPage() {
       <PageHeader
         title="Tables & Floor"
         subtitle="Tap any table to edit · Filter by status · Manage sections & QR codes"
-        actions={<BtnPrimary onClick={openCreate}><Plus size={18} /> Add Table</BtnPrimary>}
+        actions={<div className="flex gap-2"><BtnSecondary onClick={downloadQrs}><Download size={18} /> QR Export</BtnSecondary><BtnPrimary onClick={openCreate}><Plus size={18} /> Add Table</BtnPrimary></div>}
       />
 
       <StatCards stats={[
@@ -192,6 +233,14 @@ export default function TablesPage() {
                 )}
                 style={{ left: table.posX, top: table.posY, width: table.maxCapacity > 4 ? 92 : 76, height: table.maxCapacity > 4 ? 92 : 76 }}
                 title={`${table.label} — ${table.status}`}
+                draggable
+                onDragEnd={(e) => {
+                  const board = e.currentTarget.parentElement?.getBoundingClientRect();
+                  if (!board) return;
+                  apiFetch("/api/tables", { method: "PATCH", body: JSON.stringify({ id: table.id, posX: Math.max(0, e.clientX - board.left - 38), posY: Math.max(0, e.clientY - board.top - 38) }) })
+                    .then(() => load())
+                    .catch(() => toast("Could not move table", "error"));
+                }}
               >
                 <span className="text-base">{table.label}</span>
                 <span className="text-[10px] font-semibold opacity-80 capitalize mt-0.5">{table.status}</span>
@@ -249,6 +298,12 @@ export default function TablesPage() {
                 <QrCode size={64} className="text-black/80" strokeWidth={1.25} />
               </div>
               <p className="text-center text-xs font-bold text-muted truncate">{t.qrCode ?? `QR-${t.label}`}</p>
+              <span
+                onClick={(e) => { e.stopPropagation(); regenerateQr(t.id); }}
+                className="mt-3 mx-auto inline-flex items-center gap-1 text-xs font-bold text-black underline"
+              >
+                <RefreshCw size={12} /> Regenerate
+              </span>
               <p className="text-center text-xs font-bold text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Tap to manage →</p>
             </button>
           ))}
@@ -268,14 +323,32 @@ export default function TablesPage() {
         <FormField label="Status"><select className={selectClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
           {["available", "occupied", "reserved", "cleaning"].map((s) => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}
         </select></FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Floor X"><input type="number" className={inputClass} value={form.posX} onChange={(e) => setForm({ ...form, posX: Number(e.target.value) })} /></FormField>
+          <FormField label="Floor Y"><input type="number" className={inputClass} value={form.posY} onChange={(e) => setForm({ ...form, posY: Number(e.target.value) })} /></FormField>
+        </div>
+        {!creating && detail && (
+          <div className="p-4 bg-cream rounded-xl border-2 border-border">
+            <h3 className="font-bold mb-3">Table Session</h3>
+            {detail.sessions[0] ? (
+              <BtnSecondary onClick={closeSession}>Close Session</BtnSecondary>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Guests"><input type="number" className={inputClass} value={sessionForm.guestCount} onChange={(e) => setSessionForm({ ...sessionForm, guestCount: Number(e.target.value) })} /></FormField>
+                <FormField label="Server"><input className={inputClass} value={sessionForm.serverName} onChange={(e) => setSessionForm({ ...sessionForm, serverName: e.target.value })} /></FormField>
+                <div className="col-span-2"><BtnSecondary onClick={openSession}>Open Walk-in Session</BtnSecondary></div>
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex gap-3 mt-6 pt-4 border-t border-border">
           <BtnPrimary onClick={saveTable}><Save size={18} /> {creating ? "Create Table" : "Save Changes"}</BtnPrimary>
           {!creating && detail && <BtnSecondary onClick={() => setConfirmDelete(detail.id)}><Trash2 size={18} /> Delete</BtnSecondary>}
         </div>
       </Drawer>
 
-      <ConfirmDialog open={!!confirmDelete} title="Delete table?" message="This will remove the table from your floor plan." confirmLabel="Delete" destructive
-        onConfirm={() => confirmDelete && deleteTable(confirmDelete)} onCancel={() => setConfirmDelete(null)} />
+      <ConfirmDialog open={!!confirmDelete} title="Delete table?" message="This will remove the table from your floor plan." confirmLabel="Delete" destructive requireReason
+        onConfirm={(reason) => confirmDelete && deleteTable(confirmDelete, reason)} onCancel={() => setConfirmDelete(null)} />
     </div>
   );
 }

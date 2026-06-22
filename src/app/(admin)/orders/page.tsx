@@ -4,12 +4,13 @@ import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { DenseGrid, type Column } from "@/components/ui/dense-grid";
 import { Drawer, FilterBar, PageHeader, StatusDot, SourceBadge, TabBar, BtnPrimary, LabeledFilterSelect, StatCards } from "@/components/ui/shared";
-import { FormField, selectClass } from "@/components/ui/forms";
+import { FormField, inputClass, selectClass } from "@/components/ui/forms";
 import { formatCurrency, cn } from "@/lib/utils";
 import { apiFetch, useToast } from "@/lib/toast";
 import { useDebouncedValue } from "@/lib/use-debounce";
 import { useInterval } from "@/lib/use-interval";
 import { useApp } from "@/lib/context";
+import { SavedViewsBar } from "@/components/ui/saved-views";
 import { format } from "date-fns";
 import { Save, X, Radio } from "lucide-react";
 
@@ -53,6 +54,31 @@ const TABLE_OPTIONS = [
   { value: "no_table", label: "No table" },
 ];
 
+interface OrderConfig {
+  dineIn: boolean;
+  takeaway: boolean;
+  counter: boolean;
+  qr: boolean;
+  requireCancelReason: boolean;
+}
+
+interface KdsConfig {
+  enabled: boolean;
+  blueOrange: number;
+  orangeRed: number;
+  audioOnRed: boolean;
+}
+
+interface ReceiptConfig {
+  footerText: string;
+  autoPrint: boolean;
+  showGstin: boolean;
+}
+
+const DEFAULT_ORDER_CONFIG: OrderConfig = { dineIn: true, takeaway: true, counter: true, qr: true, requireCancelReason: true };
+const DEFAULT_KDS_CONFIG: KdsConfig = { enabled: false, blueOrange: 15, orangeRed: 20, audioOnRed: true };
+const DEFAULT_RECEIPT_CONFIG: ReceiptConfig = { footerText: "Thank you for dining with us!", autoPrint: true, showGstin: true };
+
 export default function OrdersPage() {
   return (
     <Suspense fallback={<div className="animate-pulse h-32 bg-cream rounded-xl" />}>
@@ -78,9 +104,13 @@ function OrdersPageContent() {
   const [tab, setTab] = useState("list");
   const [detail, setDetail] = useState<OrderRow | null>(null);
   const [newStatus, setNewStatus] = useState("");
-  const [kdsConfig, setKdsConfig] = useState({ enabled: false, blueOrange: 15, orangeRed: 20, audioOnRed: true });
+  const [cancelReason, setCancelReason] = useState("");
+  const [orderConfig, setOrderConfig] = useState<OrderConfig>(DEFAULT_ORDER_CONFIG);
+  const [kdsConfig, setKdsConfig] = useState<KdsConfig>(DEFAULT_KDS_CONFIG);
+  const [receiptConfig, setReceiptConfig] = useState<ReceiptConfig>(DEFAULT_RECEIPT_CONFIG);
 
   const hasActiveFilters = !!(search || statusFilter || sourceFilter || periodFilter !== DEFAULT_PERIOD || tableFilter);
+  const currentFilters = { search, statusFilter, sourceFilter, periodFilter, tableFilter };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,6 +134,16 @@ function OrdersPageContent() {
     load().catch((e) => toast(e instanceof Error ? e.message : "Failed to load orders", "error"));
   }, [load, toast]);
 
+  useEffect(() => {
+    apiFetch<{ orderControls?: Partial<OrderConfig>; kds?: Partial<KdsConfig>; receipt?: Partial<ReceiptConfig> }>("/api/admin-config?scope=orders")
+      .then((config) => {
+        setOrderConfig({ ...DEFAULT_ORDER_CONFIG, ...config.orderControls });
+        setKdsConfig({ ...DEFAULT_KDS_CONFIG, ...config.kds });
+        setReceiptConfig({ ...DEFAULT_RECEIPT_CONFIG, ...config.receipt });
+      })
+      .catch(() => {});
+  }, []);
+
   useInterval(() => {
     if (liveMode && tab === "list") {
       load().catch(() => {});
@@ -118,6 +158,7 @@ function OrdersPageContent() {
         if (full) {
           setDetail(full);
           setNewStatus(full.status);
+          setCancelReason("");
         }
       })
       .catch(() => {});
@@ -141,6 +182,7 @@ function OrdersPageContent() {
       }
       setDetail(full);
       setNewStatus(full.status);
+      setCancelReason("");
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not open order", "error");
     }
@@ -148,10 +190,26 @@ function OrdersPageContent() {
 
   const updateStatus = async () => {
     if (!detail) return;
+    if (newStatus === "cancelled" && orderConfig.requireCancelReason && !cancelReason.trim()) {
+      toast("Cancellation reason is required", "error");
+      return;
+    }
     try {
-      await apiFetch("/api/orders", { method: "PATCH", body: JSON.stringify({ id: detail.id, status: newStatus }) });
+      await apiFetch("/api/orders", { method: "PATCH", body: JSON.stringify({ id: detail.id, status: newStatus, cancelReason }) });
       toast("Order updated"); setDetail(null); load();
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+
+  const saveOrderConfig = async (key: string, value: OrderConfig | KdsConfig | ReceiptConfig, message: string) => {
+    try {
+      await apiFetch("/api/admin-config", {
+        method: "PATCH",
+        body: JSON.stringify({ scope: "orders", key, value }),
+      });
+      toast(message);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Failed to save settings", "error");
+    }
   };
 
   const columns: Column<OrderRow>[] = [
@@ -209,6 +267,18 @@ function OrdersPageContent() {
             search={search}
             onSearchChange={setSearch}
             placeholder="Search order # or table…"
+          />
+
+          <SavedViewsBar
+            module="orders"
+            currentFilters={currentFilters}
+            onApply={(filters) => {
+              setSearch(String(filters.search ?? ""));
+              setStatusFilter(String(filters.statusFilter ?? ""));
+              setSourceFilter(String(filters.sourceFilter ?? ""));
+              setPeriodFilter(String(filters.periodFilter ?? DEFAULT_PERIOD));
+              setTableFilter(String(filters.tableFilter ?? ""));
+            }}
           />
 
           <div className="flex items-center gap-2 mb-5 p-2.5 bg-white border-2 border-border rounded-xl">
@@ -275,10 +345,16 @@ function OrdersPageContent() {
 
       {tab === "config" && (
         <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          {["Dine-In", "Takeaway", "Counter", "QR"].map((t) => (
-            <label key={t} className="flex justify-between font-bold text-black"><span>{t}</span><input type="checkbox" defaultChecked className="w-5 h-5 accent-[#F4B315]" /></label>
+          {([
+            ["dineIn", "Dine-In"],
+            ["takeaway", "Takeaway"],
+            ["counter", "Counter"],
+            ["qr", "QR Ordering"],
+            ["requireCancelReason", "Require cancel reason"],
+          ] as const).map(([key, label]) => (
+            <label key={key} className="flex justify-between font-bold text-black"><span>{label}</span><input type="checkbox" checked={orderConfig[key]} onChange={(e) => setOrderConfig({ ...orderConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
           ))}
-          <BtnPrimary onClick={() => toast("Order controls saved")}><Save size={18} /> Save Settings</BtnPrimary>
+          <BtnPrimary onClick={() => saveOrderConfig("orderControls", orderConfig, "Order controls saved")}><Save size={18} /> Save Settings</BtnPrimary>
         </div>
       )}
 
@@ -286,15 +362,18 @@ function OrdersPageContent() {
         <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
           <label className="flex justify-between font-bold"><span>KDS Enabled</span><input type="checkbox" checked={kdsConfig.enabled} onChange={(e) => setKdsConfig({ ...kdsConfig, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
           <label className="flex justify-between font-bold"><span>Blue → Orange (min)</span><input type="number" className="w-20 border-2 rounded-lg px-2 py-1" value={kdsConfig.blueOrange} onChange={(e) => setKdsConfig({ ...kdsConfig, blueOrange: Number(e.target.value) })} /></label>
-          <BtnPrimary onClick={() => toast("KDS settings saved")}><Save size={18} /> Save</BtnPrimary>
+          <label className="flex justify-between font-bold"><span>Orange → Red (min)</span><input type="number" className="w-20 border-2 rounded-lg px-2 py-1" value={kdsConfig.orangeRed} onChange={(e) => setKdsConfig({ ...kdsConfig, orangeRed: Number(e.target.value) })} /></label>
+          <label className="flex justify-between font-bold"><span>Audio on red</span><input type="checkbox" checked={kdsConfig.audioOnRed} onChange={(e) => setKdsConfig({ ...kdsConfig, audioOnRed: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <BtnPrimary onClick={() => saveOrderConfig("kds", kdsConfig, "KDS settings saved")}><Save size={18} /> Save</BtnPrimary>
         </div>
       )}
 
       {tab === "receipt" && (
         <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          <FormField label="Footer Text"><textarea className="w-full border-2 border-border rounded-xl p-3 font-medium" rows={3} defaultValue="Thank you for dining with us!" /></FormField>
-          <label className="flex justify-between font-bold"><span>Auto-print receipts</span><input type="checkbox" defaultChecked className="w-5 h-5 accent-[#F4B315]" /></label>
-          <BtnPrimary onClick={() => toast("Receipt config saved")}><Save size={18} /> Save</BtnPrimary>
+          <FormField label="Footer Text"><textarea className={`${inputClass} min-h-24`} value={receiptConfig.footerText} onChange={(e) => setReceiptConfig({ ...receiptConfig, footerText: e.target.value })} /></FormField>
+          <label className="flex justify-between font-bold"><span>Auto-print receipts</span><input type="checkbox" checked={receiptConfig.autoPrint} onChange={(e) => setReceiptConfig({ ...receiptConfig, autoPrint: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <label className="flex justify-between font-bold"><span>Show GSTIN/FSSAI</span><input type="checkbox" checked={receiptConfig.showGstin} onChange={(e) => setReceiptConfig({ ...receiptConfig, showGstin: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <BtnPrimary onClick={() => saveOrderConfig("receipt", receiptConfig, "Receipt config saved")}><Save size={18} /> Save</BtnPrimary>
         </div>
       )}
 
@@ -316,6 +395,11 @@ function OrdersPageContent() {
             <FormField label="Update Status"><select className={selectClass} value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
               {["pending", "confirmed", "preparing", "ready", "served", "cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
             </select></FormField>
+            {newStatus === "cancelled" && (
+              <FormField label="Cancellation Reason" required={orderConfig.requireCancelReason}>
+                <textarea className={`${inputClass} min-h-24`} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+              </FormField>
+            )}
             <BtnPrimary onClick={updateStatus}><Save size={18} /> Update Order</BtnPrimary>
           </div>
         )}

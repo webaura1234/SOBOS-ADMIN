@@ -4,12 +4,34 @@ import { audit } from "@/lib/api-helpers";
 
 export async function GET() {
   const config = await prisma.paymentConfig.findFirst();
+  const recentOrders = await prisma.order.findMany({
+    where: { status: { not: "cancelled" } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+    select: { id: true, number: true, source: true, total: true, createdAt: true },
+  });
   const refunds = await prisma.refund.findMany({
     include: { order: { select: { number: true, tableLabel: true } } },
     orderBy: { createdAt: "desc" },
     take: 20,
   });
-  return NextResponse.json({ config, refunds });
+  const commissionRates = {
+    swiggy: config?.swiggyRate ?? 18,
+    zomato: config?.zomatoRate ?? 20,
+    ondc: config?.ondcRate ?? 10,
+  };
+  const settlements = Object.entries(recentOrders.reduce<Record<string, { source: string; orderCount: number; gross: number; commission: number; net: number }>>((acc, order) => {
+    const rate = commissionRates[order.source as keyof typeof commissionRates] ?? 0;
+    const commission = Math.round(order.total * rate) / 100;
+    const row = acc[order.source] ?? { source: order.source, orderCount: 0, gross: 0, commission: 0, net: 0 };
+    row.orderCount += 1;
+    row.gross += order.total;
+    row.commission += commission;
+    row.net += order.total - commission;
+    acc[order.source] = row;
+    return acc;
+  }, {})).map(([, row]) => row);
+  return NextResponse.json({ config, refunds, settlements });
 }
 
 export async function PATCH(req: NextRequest) {

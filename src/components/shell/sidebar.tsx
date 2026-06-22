@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { sidebarCollapsed, setSidebarCollapsed, restaurantName, opsSummary } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed, restaurantName, opsSummary, hasPermission } = useApp();
 
   const expand = () => setSidebarCollapsed(false);
   const toggle = () => setSidebarCollapsed(!sidebarCollapsed);
@@ -54,7 +54,9 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 overflow-y-auto py-3 px-2 scrollbar-thin" aria-label="Main navigation">
         {NAV_GROUPS.map((group) => {
-          const items = NAV_ITEMS.filter((item) => (group.hrefs as readonly string[]).includes(item.href));
+          const items = NAV_ITEMS.filter(
+            (item) => (group.hrefs as readonly string[]).includes(item.href) && hasPermission(item.permission)
+          );
           if (items.length === 0) return null;
           return (
             <div key={group.label} className="mb-3">

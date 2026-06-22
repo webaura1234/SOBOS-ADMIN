@@ -13,12 +13,12 @@ export function isDensity(value: string | null | undefined): value is Density {
 }
 
 export function readStoredDensity(): Density {
-  if (typeof window === "undefined") return "comfortable";
+  if (typeof window === "undefined") return "compact";
   try {
     const saved = localStorage.getItem(DENSITY_STORAGE_KEY);
-    return isDensity(saved) ? saved : "comfortable";
+    return isDensity(saved) ? saved : "compact";
   } catch {
-    return "comfortable";
+    return "compact";
   }
 }
 

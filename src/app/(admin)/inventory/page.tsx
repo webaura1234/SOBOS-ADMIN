@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { DenseGrid, type Column } from "@/components/ui/dense-grid";
-import { Drawer, FilterBar, PageHeader, StatusDot, TabBar, BtnPrimary } from "@/components/ui/shared";
+import { Drawer, FilterBar, PageHeader, StatusDot, TabBar, BtnPrimary, BtnSecondary } from "@/components/ui/shared";
 import { FormField, inputClass, selectClass } from "@/components/ui/forms";
 import { stockStatus, cn } from "@/lib/utils";
 import { apiFetch, useToast } from "@/lib/toast";
@@ -30,7 +30,7 @@ export default function InventoryPage() {
 
 function InventoryPageContent() {
   const { toast } = useToast();
-  const { locationId } = useApp();
+  const { locationId, locations } = useApp();
   const searchParams = useSearchParams();
   const [tab, setTab] = useState("stock");
   const [search, setSearch] = useState("");
@@ -41,10 +41,15 @@ function InventoryPageContent() {
   const [wastage, setWastage] = useState<{ id: string; ingredient: { name: string }; quantity: number; reason: string; createdAt: string }[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; phone: string | null; rating: number | null; isActive: boolean }[]>([]);
   const [pos, setPos] = useState<{ id: string; number: string; status: string; total: number; supplier: { name: string } }[]>([]);
+  const [ingredients, setIngredients] = useState<{ id: string; name: string; unit: string }[]>([]);
   const [detail, setDetail] = useState<StockRow | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   const [wastageForm, setWastageForm] = useState({ stockId: "", quantity: 0, reason: "Expired" });
   const [showWastage, setShowWastage] = useState(false);
+  const [showSupplier, setShowSupplier] = useState(false);
+  const [showPo, setShowPo] = useState(false);
+  const [supplierForm, setSupplierForm] = useState({ name: "", contact: "", phone: "", email: "" });
+  const [poForm, setPoForm] = useState({ supplierId: "", locationId: "", ingredientId: "", qtyOrdered: 1, unitPrice: 0 });
 
   const load = useCallback(async () => {
     const params = new URLSearchParams({ tab });
@@ -56,6 +61,8 @@ function InventoryPageContent() {
     if (tab === "wastage") setWastage((data.wastage as typeof wastage) ?? []);
     if (tab === "suppliers") setSuppliers((data.suppliers as typeof suppliers) ?? []);
     if (tab === "pos") setPos((data.purchaseOrders as typeof pos) ?? []);
+    if (data.suppliers) setSuppliers((data.suppliers as typeof suppliers) ?? []);
+    if (data.ingredients) setIngredients((data.ingredients as typeof ingredients) ?? []);
   }, [tab, locationId, debouncedSearch]);
 
   useEffect(() => { load().catch((e) => toast(e.message, "error")); }, [load, toast]);
@@ -96,6 +103,43 @@ function InventoryPageContent() {
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
   };
 
+  const createSupplier = async () => {
+    try {
+      await apiFetch("/api/inventory", { method: "POST", body: JSON.stringify({ type: "supplier", data: supplierForm }) });
+      toast("Supplier created");
+      setShowSupplier(false);
+      setSupplierForm({ name: "", contact: "", phone: "", email: "" });
+      load();
+    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+
+  const createPo = async () => {
+    try {
+      const total = Number(poForm.qtyOrdered) * Number(poForm.unitPrice);
+      await apiFetch("/api/inventory", {
+        method: "POST",
+        body: JSON.stringify({
+          type: "po",
+          supplierId: poForm.supplierId,
+          locationId: poForm.locationId || locationId || locations[0]?.id,
+          total,
+          lines: [{ ingredientId: poForm.ingredientId, qtyOrdered: Number(poForm.qtyOrdered), unitPrice: Number(poForm.unitPrice) }],
+        }),
+      });
+      toast("Purchase order created");
+      setShowPo(false);
+      load();
+    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+
+  const receivePo = async (id: string) => {
+    try {
+      await apiFetch("/api/inventory", { method: "PATCH", body: JSON.stringify({ type: "receive_po", id }) });
+      toast("Purchase order received and stock updated");
+      load();
+    } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+
   const stockColumns: Column<StockRow>[] = [
     { key: "name", header: "Ingredient", render: (r) => r.ingredient.name },
     { key: "qty", header: "Qty", align: "right", render: (r) => `${r.quantity} ${r.ingredient.unit}` },
@@ -106,7 +150,16 @@ function InventoryPageContent() {
   return (
     <div>
       <PageHeader title="Inventory" subtitle="Stock, batches, wastage, suppliers, POs"
-        actions={<BtnPrimary onClick={() => { setShowWastage(true); setWastageForm({ stockId: stock[0]?.id ?? "", quantity: 0, reason: "Expired" }); }}><Plus size={18} /> Log Wastage</BtnPrimary>} />
+        actions={
+          <div className="flex gap-2">
+            {tab === "suppliers" && <BtnSecondary onClick={() => setShowSupplier(true)}><Plus size={18} /> Supplier</BtnSecondary>}
+            {tab === "pos" && <BtnSecondary onClick={() => {
+              setPoForm({ supplierId: suppliers[0]?.id ?? "", locationId: locationId ?? locations[0]?.id ?? "", ingredientId: ingredients[0]?.id ?? "", qtyOrdered: 1, unitPrice: 0 });
+              setShowPo(true);
+            }}><Plus size={18} /> PO</BtnSecondary>}
+            <BtnPrimary onClick={() => { setShowWastage(true); setWastageForm({ stockId: stock[0]?.id ?? "", quantity: 0, reason: "Expired" }); }}><Plus size={18} /> Log Wastage</BtnPrimary>
+          </div>
+        } />
 
       <TabBar tabs={[{ id: "stock", label: "Stock" }, { id: "batches", label: "Batches" }, { id: "wastage", label: "Wastage" }, { id: "suppliers", label: "Suppliers" }, { id: "pos", label: "Purchase Orders" }]} active={tab} onChange={setTab} />
 
@@ -148,6 +201,7 @@ function InventoryPageContent() {
         { key: "number", header: "PO #" }, { key: "supplier", header: "Supplier", render: (r) => r.supplier.name },
         { key: "status", header: "Status", render: (r) => <StatusDot status={r.status} /> },
         { key: "total", header: "Total", align: "right", render: (r) => `₹${r.total}` },
+        { key: "receive", header: "Receive", render: (r) => r.status === "received" ? "Done" : <button type="button" onClick={(e) => { e.stopPropagation(); receivePo(r.id); }} className="font-bold text-black underline">Receive</button> },
       ]} data={pos} selectable={false} onRowClick={() => {}} />}
 
       <Drawer open={!!detail} onClose={() => setDetail(null)} title={`Adjust: ${detail?.ingredient.name}`}>
@@ -164,6 +218,29 @@ function InventoryPageContent() {
           {["Expired", "Spoiled", "Over-Prepared", "Dropped", "Other"].map((r) => <option key={r} value={r}>{r}</option>)}
         </select></FormField>
         <BtnPrimary onClick={submitWastage} className="mt-4"><Save size={18} /> Log Wastage</BtnPrimary>
+      </Drawer>
+
+      <Drawer open={showSupplier} onClose={() => setShowSupplier(false)} title="New Supplier">
+        <FormField label="Name"><input className={inputClass} value={supplierForm.name} onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })} /></FormField>
+        <FormField label="Contact"><input className={inputClass} value={supplierForm.contact} onChange={(e) => setSupplierForm({ ...supplierForm, contact: e.target.value })} /></FormField>
+        <FormField label="Phone"><input className={inputClass} value={supplierForm.phone} onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })} /></FormField>
+        <FormField label="Email"><input className={inputClass} value={supplierForm.email} onChange={(e) => setSupplierForm({ ...supplierForm, email: e.target.value })} /></FormField>
+        <BtnPrimary onClick={createSupplier} className="mt-4"><Save size={18} /> Create Supplier</BtnPrimary>
+      </Drawer>
+
+      <Drawer open={showPo} onClose={() => setShowPo(false)} title="New Purchase Order">
+        <FormField label="Supplier"><select className={selectClass} value={poForm.supplierId} onChange={(e) => setPoForm({ ...poForm, supplierId: e.target.value })}>
+          {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+        </select></FormField>
+        <FormField label="Location"><select className={selectClass} value={poForm.locationId} onChange={(e) => setPoForm({ ...poForm, locationId: e.target.value })}>
+          {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+        </select></FormField>
+        <FormField label="Ingredient"><select className={selectClass} value={poForm.ingredientId} onChange={(e) => setPoForm({ ...poForm, ingredientId: e.target.value })}>
+          {ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name} ({ingredient.unit})</option>)}
+        </select></FormField>
+        <FormField label="Quantity"><input type="number" className={inputClass} value={poForm.qtyOrdered} onChange={(e) => setPoForm({ ...poForm, qtyOrdered: Number(e.target.value) })} /></FormField>
+        <FormField label="Unit Price"><input type="number" className={inputClass} value={poForm.unitPrice} onChange={(e) => setPoForm({ ...poForm, unitPrice: Number(e.target.value) })} /></FormField>
+        <BtnPrimary onClick={createPo} className="mt-4"><Save size={18} /> Create PO</BtnPrimary>
       </Drawer>
     </div>
   );

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full" data-density="comfortable" suppressHydrationWarning>
+    <html lang="en" className="h-full" data-density="compact" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{

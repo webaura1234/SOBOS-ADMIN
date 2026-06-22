@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { Save, Plus } from "lucide-react";
 
 interface PaymentConfig {
+  razorpayKey: string | null;
   id: string; cashEnabled: boolean; cardEnabled: boolean; upiEnabled: boolean;
   splitEnabled: boolean; tipsEnabled: boolean; tipPooling: string;
   swiggyRate: number; zomatoRate: number; ondcRate: number;
@@ -20,19 +21,29 @@ interface RefundRow {
   order: { number: string; tableLabel: string | null };
 }
 
+interface SettlementRow {
+  source: string;
+  orderCount: number;
+  gross: number;
+  commission: number;
+  net: number;
+}
+
 export default function PaymentsPage() {
   const { toast } = useToast();
   const [config, setConfig] = useState<PaymentConfig | null>(null);
   const [refunds, setRefunds] = useState<RefundRow[]>([]);
+  const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [tab, setTab] = useState("methods");
   const [showRefund, setShowRefund] = useState(false);
   const [refundForm, setRefundForm] = useState({ orderId: "", amount: 0, reason: "" });
   const [orderOptions, setOrderOptions] = useState<{ id: string; number: string; total: number }[]>([]);
 
   const load = async () => {
-    const data = await apiFetch<{ config: PaymentConfig; refunds: RefundRow[] }>("/api/payments");
+    const data = await apiFetch<{ config: PaymentConfig; refunds: RefundRow[]; settlements: SettlementRow[] }>("/api/payments");
     setConfig(data.config);
     setRefunds(data.refunds);
+    setSettlements(data.settlements);
     const orders = await apiFetch<{ id: string; number: string; total: number }[]>("/api/orders");
     setOrderOptions(orders.slice(0, 20));
   };
@@ -61,13 +72,21 @@ export default function PaymentsPage() {
     { key: "status", header: "Status", render: (r) => <StatusDot status={r.status} /> },
   ];
 
+  const settlementColumns: Column<SettlementRow & { id: string }>[] = [
+    { key: "source", header: "Source", render: (r) => <span className="capitalize font-bold">{r.source.replace(/_/g, " ")}</span> },
+    { key: "orderCount", header: "Orders", align: "right" },
+    { key: "gross", header: "Gross", align: "right", render: (r) => formatCurrency(r.gross) },
+    { key: "commission", header: "Commission", align: "right", render: (r) => formatCurrency(r.commission) },
+    { key: "net", header: "Net Settlement", align: "right", render: (r) => formatCurrency(r.net) },
+  ];
+
   if (!config) return <div className="animate-pulse h-32 bg-cream rounded-xl" />;
 
   return (
     <div>
       <PageHeader title="Payments" subtitle="Methods, commissions, refunds"
         actions={tab === "refunds" ? <BtnPrimary onClick={() => setShowRefund(true)}><Plus size={18} /> Issue Refund</BtnPrimary> : undefined} />
-      <TabBar tabs={[{ id: "methods", label: "Payment Methods" }, { id: "tips", label: "Tips" }, { id: "commissions", label: "Commissions" }, { id: "refunds", label: "Refunds" }]} active={tab} onChange={setTab} />
+      <TabBar tabs={[{ id: "methods", label: "Payment Methods" }, { id: "tips", label: "Tips" }, { id: "commissions", label: "Commissions" }, { id: "settlements", label: "Settlements" }, { id: "refunds", label: "Refunds" }]} active={tab} onChange={setTab} />
 
       {tab === "methods" && (
         <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
@@ -75,6 +94,7 @@ export default function PaymentsPage() {
             <label key={key} className="flex justify-between font-bold text-black"><span>{label}</span>
               <input type="checkbox" checked={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
           ))}
+          <FormField label="Razorpay Key ID"><input className={inputClass} value={config.razorpayKey ?? ""} onChange={(e) => setConfig({ ...config, razorpayKey: e.target.value })} /></FormField>
           <BtnPrimary onClick={saveConfig}><Save size={18} /> Save</BtnPrimary>
         </div>
       )}
@@ -98,6 +118,8 @@ export default function PaymentsPage() {
           <BtnPrimary onClick={saveConfig}><Save size={18} /> Save</BtnPrimary>
         </div>
       )}
+
+      {tab === "settlements" && <DenseGrid columns={settlementColumns} data={settlements.map((row) => ({ ...row, id: row.source }))} selectable={false} onRowClick={() => {}} />}
 
       {tab === "refunds" && <DenseGrid columns={refundColumns} data={refunds} selectable={false} onRowClick={() => {}} />}
 

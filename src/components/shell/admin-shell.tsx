@@ -12,7 +12,33 @@ import { KeyboardShortcuts } from "./keyboard-shortcuts";
 import { useInterval } from "@/lib/use-interval";
 
 function ShellInner({ children }: { children: React.ReactNode }) {
-  const { setLocations, setLocationId, locationId, setOpsSummary } = useApp();
+  const {
+    setLocations,
+    setLocationId,
+    locationId,
+    setOpsSummary,
+    setUserRole,
+    setUserName,
+    setRestaurantName,
+    setPermissions,
+  } = useApp();
+
+  useEffect(() => {
+    const role = typeof window !== "undefined" ? window.localStorage.getItem("demoUserRole") : null;
+    const params = role ? `?role=${role}` : "";
+    apiFetch<{
+      user: { name: string; role: "owner" | "manager" };
+      restaurant: { name: string };
+      permissions: string[];
+    }>(`/api/session${params}`)
+      .then((session) => {
+        setUserName(session.user.name);
+        setUserRole(session.user.role);
+        setRestaurantName(session.restaurant.name);
+        setPermissions(session.permissions);
+      })
+      .catch(console.error);
+  }, [setPermissions, setRestaurantName, setUserName, setUserRole]);
 
   useEffect(() => {
     fetch("/api/locations")
@@ -36,6 +62,26 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   }, [locationId, setOpsSummary]);
 
   useEffect(() => { loadOps(); }, [loadOps]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.EventSource === "undefined") return;
+    const params = locationId ? `?locationId=${locationId}` : "";
+    const source = new EventSource(`/api/realtime/stream${params}`);
+    source.addEventListener("ops-summary", (event) => {
+      try {
+        const data = JSON.parse((event as MessageEvent).data) as { activeOrders: number; lowStockCount: number };
+        setOpsSummary({ activeOrders: data.activeOrders, lowStockCount: data.lowStockCount });
+      } catch {
+        // Keep polling fallback responsible for recovery.
+      }
+    });
+    source.onerror = () => {
+      source.close();
+      loadOps();
+    };
+    return () => source.close();
+  }, [loadOps, locationId, setOpsSummary]);
+
   useInterval(loadOps, 30000);
 
   return (

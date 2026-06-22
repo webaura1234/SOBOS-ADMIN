@@ -21,7 +21,7 @@ interface NotificationItem {
 export function Header() {
   const {
     density, setDensity, locationId, setLocationId, locations,
-    userName, setCommandPaletteOpen, setGlobalSearchOpen,
+    userName, userRole, setCommandPaletteOpen, setGlobalSearchOpen,
   } = useApp();
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -100,6 +100,12 @@ export function Header() {
     } else {
       setGlobalSearchOpen(true);
     }
+  };
+
+  const signOut = async () => {
+    await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.localStorage.removeItem("demoUserRole");
+    window.location.href = "/login";
   };
 
   return (
@@ -269,12 +275,12 @@ export function Header() {
               <div className="absolute right-0 top-full mt-2 w-56 bg-white border-2 border-border rounded-2xl shadow-xl z-50 overflow-hidden py-1">
                 <div className="px-4 py-3 border-b border-border bg-cream">
                   <div className="font-bold text-black text-base">{userName}</div>
-                  <div className="text-sm text-muted font-medium">Owner</div>
+                  <div className="text-sm text-muted font-medium capitalize">{userRole}</div>
                 </div>
                 <Link href="/settings" onClick={() => setShowProfile(false)} className="flex items-center gap-3 px-4 py-3 text-base font-semibold hover:bg-cream focus-ring">
                   <Settings size={18} /> Settings
                 </Link>
-                <button type="button" onClick={() => setShowProfile(false)} className="flex items-center gap-3 px-4 py-3 text-base font-semibold text-red-600 hover:bg-red-50 w-full focus-ring">
+                <button type="button" onClick={signOut} className="flex items-center gap-3 px-4 py-3 text-base font-semibold text-red-600 hover:bg-red-50 w-full focus-ring">
                   <LogOut size={18} /> Sign out
                 </button>
               </div>

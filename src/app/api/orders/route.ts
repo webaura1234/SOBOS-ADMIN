@@ -52,6 +52,9 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const { id, status, cancelReason } = await req.json();
+    if (status === "cancelled" && !String(cancelReason ?? "").trim()) {
+      return NextResponse.json({ error: "Cancellation reason is required" }, { status: 400 });
+    }
     const order = await prisma.order.update({
       where: { id },
       data: { status },

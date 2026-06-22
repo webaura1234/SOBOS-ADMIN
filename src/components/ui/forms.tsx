@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { BtnPrimary, BtnSecondary } from "./shared";
+import { useEffect, useRef, useState } from "react";
+import { BtnSecondary } from "./shared";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -9,7 +9,9 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel?: string;
   destructive?: boolean;
-  onConfirm: () => void;
+  requireReason?: boolean;
+  reasonLabel?: string;
+  onConfirm: (reason?: string) => void;
   onCancel: () => void;
 }
 
@@ -19,15 +21,23 @@ export function ConfirmDialog({
   message,
   confirmLabel = "Confirm",
   destructive,
+  requireReason,
+  reasonLabel = "Reason",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const [reason, setReason] = useState("");
 
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    open ? d.showModal() : d.close();
+    if (open) {
+      setReason("");
+      d.showModal();
+    } else {
+      d.close();
+    }
   }, [open]);
 
   return (
@@ -39,12 +49,28 @@ export function ConfirmDialog({
       <div className="p-6">
         <h2 className="text-lg font-bold text-black mb-2">{title}</h2>
         <p className="text-base text-muted font-medium mb-6">{message}</p>
+        {requireReason && (
+          <label className="block mb-6">
+            <span className="text-sm font-bold text-black block mb-2">{reasonLabel} <span className="text-red-600">*</span></span>
+            <textarea
+              className="w-full min-h-24 px-3 py-2 border-2 border-border rounded-xl text-base font-semibold bg-white focus-ring text-black"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Add an audit reason"
+            />
+          </label>
+        )}
         <div className="flex gap-3 justify-end">
           <BtnSecondary onClick={onCancel}>Cancel</BtnSecondary>
           <button
             type="button"
-            onClick={() => { onConfirm(); onCancel(); }}
-            className={destructive ? "btn-primary !bg-red-600 !border-red-600 !text-white" : "btn-primary"}
+            onClick={() => {
+              if (requireReason && !reason.trim()) return;
+              onConfirm(reason.trim() || undefined);
+              onCancel();
+            }}
+            disabled={requireReason && !reason.trim()}
+            className={destructive ? "btn-primary !bg-red-600 !border-red-600 !text-white disabled:opacity-50 disabled:cursor-not-allowed" : "btn-primary disabled:opacity-50 disabled:cursor-not-allowed"}
           >
             {confirmLabel}
           </button>

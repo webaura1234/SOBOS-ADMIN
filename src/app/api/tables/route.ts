@@ -39,6 +39,22 @@ export async function POST(req: NextRequest) {
       await audit("create", "table_section", section.id, section);
       return NextResponse.json(section, { status: 201 });
     }
+    if (body.type === "session") {
+      const table = await prisma.restaurantTable.findUnique({ where: { id: body.tableId } });
+      if (!table) return NextResponse.json({ error: "Table not found" }, { status: 404 });
+      const session = await prisma.tableSession.create({
+        data: {
+          tableId: table.id,
+          locationId: table.locationId,
+          guestCount: Number(body.guestCount) || 1,
+          serverName: body.serverName ?? null,
+          status: "open",
+        },
+      });
+      await prisma.restaurantTable.update({ where: { id: table.id }, data: { status: "occupied" } });
+      await audit("create", "table_session", session.id, session);
+      return NextResponse.json(session, { status: 201 });
+    }
     const table = await prisma.restaurantTable.create({
       data: {
         locationId: body.locationId,
@@ -73,6 +89,24 @@ export async function PATCH(req: NextRequest) {
       await audit("update", "table_section", id, data);
       return NextResponse.json(section);
     }
+    if (type === "close_session") {
+      const session = await prisma.tableSession.update({
+        where: { id },
+        data: { status: "closed", endedAt: new Date() },
+      });
+      await prisma.restaurantTable.update({ where: { id: session.tableId }, data: { status: "cleaning" } });
+      await audit("close", "table_session", id, data);
+      return NextResponse.json(session);
+    }
+    if (type === "qr") {
+      const table = await prisma.restaurantTable.update({
+        where: { id },
+        data: { qrCode: `QR-${id}-${Date.now()}` },
+        include: { section: { select: { id: true, name: true } }, sessions: { where: { status: "open" }, take: 1 } },
+      });
+      await audit("update", "table_qr", id, table.qrCode);
+      return NextResponse.json(table);
+    }
     const table = await prisma.restaurantTable.update({
       where: { id },
       data,
@@ -89,13 +123,14 @@ export async function DELETE(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get("id");
     const type = req.nextUrl.searchParams.get("type");
+    const reason = req.nextUrl.searchParams.get("reason") ?? "No reason provided";
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
     if (type === "section") {
       await prisma.tableSection.delete({ where: { id } });
     } else {
       await prisma.restaurantTable.update({ where: { id }, data: { isDeleted: true } });
     }
-    await audit("delete", type ?? "restaurant_table", id);
+    await audit("delete", type ?? "restaurant_table", id, { reason });
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });

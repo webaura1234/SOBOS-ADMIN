@@ -107,6 +107,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get("id");
     const type = req.nextUrl.searchParams.get("type");
+    const reason = req.nextUrl.searchParams.get("reason") ?? "No reason provided";
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
     if (type === "reservation") {
       await prisma.reservation.update({ where: { id }, data: { status: "cancelled" } });
@@ -115,7 +116,7 @@ export async function DELETE(req: NextRequest) {
     } else {
       await prisma.customer.delete({ where: { id } });
     }
-    await audit("delete", type ?? "customer", id);
+    await audit("delete", type ?? "customer", id, { reason });
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });

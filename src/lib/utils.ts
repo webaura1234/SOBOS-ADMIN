@@ -41,7 +41,7 @@ export const NAV_GROUPS = [
   { label: "Overview", hrefs: ["/dashboard", "/analytics"] as const },
   { label: "Operations", hrefs: ["/menu", "/tables", "/inventory", "/orders"] as const },
   { label: "Business", hrefs: ["/payments", "/staff", "/customers"] as const },
-  { label: "System", hrefs: ["/integrations", "/settings", "/audit"] as const },
+  { label: "System", hrefs: ["/setup", "/integrations", "/settings", "/audit"] as const },
 ] as const;
 
 export const NAV_ITEMS = [
@@ -54,6 +54,7 @@ export const NAV_ITEMS = [
   { href: "/staff", label: "Staff & Labor", icon: "Users", permission: "staff.manage" },
   { href: "/analytics", label: "Analytics", icon: "BarChart3", permission: "reports.view" },
   { href: "/customers", label: "Customers", icon: "Gift", permission: "reports.view" },
+  { href: "/setup", label: "Setup", icon: "Sparkles", permission: "settings.restaurant" },
   { href: "/integrations", label: "Integrations", icon: "Plug", permission: "settings.integrations" },
   { href: "/settings", label: "Settings", icon: "Settings", permission: "settings.restaurant" },
   { href: "/audit", label: "Audit", icon: "Shield", permission: "settings.restaurant" },

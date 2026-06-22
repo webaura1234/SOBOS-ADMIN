@@ -65,9 +65,9 @@ export default function CustomersPage() {
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
   };
 
-  const deleteCustomer = async (id: string) => {
+  const deleteCustomer = async (id: string, reason?: string) => {
     try {
-      await apiFetch(`/api/customers?id=${id}`, { method: "DELETE" });
+      await apiFetch(`/api/customers?id=${id}&reason=${encodeURIComponent(reason ?? "No reason provided")}`, { method: "DELETE" });
       toast("Customer deleted"); setDetail(null); load();
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
   };
@@ -144,7 +144,7 @@ export default function CustomersPage() {
       </Drawer>
 
       <ConfirmDialog open={!!confirmDelete} title="Delete customer?" message="This will permanently remove the customer." confirmLabel="Delete" destructive
-        onConfirm={() => confirmDelete && deleteCustomer(confirmDelete)} onCancel={() => setConfirmDelete(null)} />
+        requireReason onConfirm={(reason) => confirmDelete && deleteCustomer(confirmDelete, reason)} onCancel={() => setConfirmDelete(null)} />
     </div>
   );
 }

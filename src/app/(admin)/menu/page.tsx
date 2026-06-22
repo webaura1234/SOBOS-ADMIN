@@ -22,6 +22,21 @@ interface MenuItem {
   availability: string;
   unitsSold: number;
   prepTime: number | null;
+  recipe?: { ingredients: RecipeLine[] } | null;
+}
+
+interface RecipeLine {
+  id?: string;
+  ingredientId: string;
+  quantity: number;
+  unit: string;
+  ingredient?: { id: string; name: string; unit: string };
+}
+
+interface IngredientOption {
+  id: string;
+  name: string;
+  unit: string;
 }
 
 interface Category {
@@ -46,6 +61,7 @@ function MenuPageContent() {
   const searchParams = useSearchParams();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [ingredients, setIngredients] = useState<IngredientOption[]>([]);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
   const [tab, setTab] = useState("items");
@@ -58,13 +74,15 @@ function MenuPageContent() {
   const [sortKey, setSortKey] = useState("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [newCategory, setNewCategory] = useState("");
+  const [recipeLines, setRecipeLines] = useState<RecipeLine[]>([]);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set("search", debouncedSearch);
-    const data = await apiFetch<{ items: MenuItem[]; categories: Category[] }>(`/api/menu?${params}`);
+    const data = await apiFetch<{ items: MenuItem[]; categories: Category[]; ingredients: IngredientOption[] }>(`/api/menu?${params}`);
     setItems(data.items ?? []);
     setCategories(data.categories ?? []);
+    setIngredients(data.ingredients ?? []);
   }, [debouncedSearch]);
 
   useEffect(() => { load().catch((e) => toast(e.message, "error")); }, [load, toast]);
@@ -73,6 +91,7 @@ function MenuPageContent() {
     setCreating(true);
     setDetail(null);
     setForm(emptyItem);
+    setRecipeLines([]);
     setDrawerTab("details");
   };
 
@@ -87,6 +106,13 @@ function MenuPageContent() {
       prepTime: item.prepTime ?? 0,
       availability: item.availability,
     });
+    setRecipeLines(item.recipe?.ingredients.map((line) => ({
+      id: line.id,
+      ingredientId: line.ingredientId,
+      quantity: line.quantity,
+      unit: line.unit || line.ingredient?.unit || "",
+      ingredient: line.ingredient,
+    })) ?? []);
     setDrawerTab("details");
   };
 
@@ -109,6 +135,9 @@ function MenuPageContent() {
         basePrice: Number(form.basePrice),
         recipeCost: Number(form.recipeCost),
         prepTime: Number(form.prepTime) || null,
+        recipeIngredients: recipeLines
+          .filter((line) => line.ingredientId && Number(line.quantity) > 0)
+          .map((line) => ({ ingredientId: line.ingredientId, quantity: Number(line.quantity), unit: line.unit })),
       };
       if (creating) {
         await apiFetch("/api/menu", { method: "POST", body: JSON.stringify(payload) });
@@ -123,9 +152,9 @@ function MenuPageContent() {
     } catch (e) { toast(e instanceof Error ? e.message : "Save failed", "error"); }
   };
 
-  const deleteItems = async (ids: string[]) => {
+  const deleteItems = async (ids: string[], reason?: string) => {
     try {
-      await apiFetch(`/api/menu?ids=${ids.join(",")}`, { method: "DELETE" });
+      await apiFetch(`/api/menu?ids=${ids.join(",")}&reason=${encodeURIComponent(reason ?? "No reason provided")}`, { method: "DELETE" });
       toast(`Deleted ${ids.length} item(s)`);
       setSelected(new Set());
       setDetail(null);
@@ -164,6 +193,23 @@ function MenuPageContent() {
     exportCsv("menu-items.csv", ["Name", "Category", "Price", "Cost", "Margin", "Status", "Sold"],
       items.map((i) => [i.name, i.category?.name ?? "", i.basePrice, i.recipeCost, i.grossMargin, i.availability, i.unitsSold]));
     toast("Exported to CSV");
+  };
+
+  const addRecipeLine = () => {
+    const first = ingredients[0];
+    setRecipeLines([...recipeLines, { ingredientId: first?.id ?? "", quantity: 1, unit: first?.unit ?? "" }]);
+  };
+
+  const updateRecipeLine = (index: number, patch: Partial<RecipeLine>) => {
+    setRecipeLines(recipeLines.map((line, idx) => {
+      if (idx !== index) return line;
+      const next = { ...line, ...patch };
+      if (patch.ingredientId) {
+        const ingredient = ingredients.find((item) => item.id === patch.ingredientId);
+        next.unit = ingredient?.unit ?? next.unit;
+      }
+      return next;
+    }));
   };
 
   const sorted = [...items].sort((a, b) => {
@@ -247,7 +293,7 @@ function MenuPageContent() {
 
       <Drawer open={creating || !!detail} onClose={() => { setCreating(false); setDetail(null); }} title={creating ? "New Menu Item" : detail?.name ?? ""}>
         <TabBar tabs={[
-          { id: "details", label: "Details" }, { id: "cost", label: "Cost & Margin" }, { id: "availability", label: "Availability" },
+          { id: "details", label: "Details" }, { id: "cost", label: "Cost & Recipe" }, { id: "availability", label: "Availability" },
         ]} active={drawerTab} onChange={setDrawerTab} />
 
         {drawerTab === "details" && (
@@ -268,6 +314,26 @@ function MenuPageContent() {
             <div className="p-4 bg-cream rounded-xl mt-4">
               <p className="font-bold">Gross Margin: {form.basePrice > 0 ? (((form.basePrice - form.recipeCost) / form.basePrice) * 100).toFixed(1) : 0}%</p>
               <p className="text-muted text-sm mt-1">Profit per item: {formatCurrency(form.basePrice - form.recipeCost)}</p>
+            </div>
+            <div className="mt-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-black">Recipe Ingredients</h3>
+                <BtnSecondary onClick={addRecipeLine}><Plus size={16} /> Add Ingredient</BtnSecondary>
+              </div>
+              <div className="space-y-2">
+                {recipeLines.map((line, index) => (
+                  <div key={`${line.ingredientId}-${index}`} className="grid grid-cols-[1fr_90px_80px_40px] gap-2 items-center">
+                    <select className={selectClass} value={line.ingredientId} onChange={(e) => updateRecipeLine(index, { ingredientId: e.target.value })}>
+                      <option value="">Ingredient</option>
+                      {ingredients.map((ingredient) => <option key={ingredient.id} value={ingredient.id}>{ingredient.name}</option>)}
+                    </select>
+                    <input type="number" className={inputClass} value={line.quantity} onChange={(e) => updateRecipeLine(index, { quantity: Number(e.target.value) })} />
+                    <input className={inputClass} value={line.unit} onChange={(e) => updateRecipeLine(index, { unit: e.target.value })} />
+                    <button type="button" onClick={() => setRecipeLines(recipeLines.filter((_, idx) => idx !== index))} className="h-11 rounded-xl border-2 border-border text-red-600 font-bold focus-ring">×</button>
+                  </div>
+                ))}
+                {recipeLines.length === 0 && <p className="text-sm font-semibold text-muted bg-cream border-2 border-border rounded-xl p-3">No recipe ingredients yet.</p>}
+              </div>
             </div>
           </div>
         )}
@@ -291,7 +357,7 @@ function MenuPageContent() {
       </Drawer>
 
       <ConfirmDialog open={!!confirmDelete} title="Delete items?" message={`Delete ${confirmDelete?.length} menu item(s)? This cannot be undone.`}
-        confirmLabel="Delete" destructive onConfirm={() => confirmDelete && deleteItems(confirmDelete)} onCancel={() => setConfirmDelete(null)} />
+        confirmLabel="Delete" destructive requireReason onConfirm={(reason) => confirmDelete && deleteItems(confirmDelete, reason)} onCancel={() => setConfirmDelete(null)} />
     </div>
   );
 }

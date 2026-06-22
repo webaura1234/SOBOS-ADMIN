@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "./shared";
 
@@ -28,6 +29,7 @@ interface DenseGridProps<T extends { id: string }> {
   emptyDescription?: string;
   className?: string;
   showRowHint?: boolean;
+  virtualizeThreshold?: number;
 }
 
 export function DenseGrid<T extends { id: string }>({
@@ -46,7 +48,60 @@ export function DenseGrid<T extends { id: string }>({
   emptyDescription,
   className,
   showRowHint = true,
+  virtualizeThreshold = 100,
 }: DenseGridProps<T>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(focusedIndex);
+  const [scrollTop, setScrollTop] = useState(0);
+  const rowHeight = 52;
+  const viewportHeight = 620;
+  const shouldVirtualize = data.length > virtualizeThreshold;
+
+  const visibleRange = useMemo(() => {
+    if (!shouldVirtualize) return { start: 0, end: data.length, topPad: 0, bottomPad: 0 };
+    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - 8);
+    const visibleCount = Math.ceil(viewportHeight / rowHeight) + 16;
+    const end = Math.min(data.length, start + visibleCount);
+    return {
+      start,
+      end,
+      topPad: start * rowHeight,
+      bottomPad: Math.max(0, (data.length - end) * rowHeight),
+    };
+  }, [data.length, scrollTop, shouldVirtualize]);
+
+  const visibleRows = data.slice(visibleRange.start, visibleRange.end);
+
+  const focusRow = (index: number) => {
+    const next = Math.max(0, Math.min(data.length - 1, index));
+    setActiveIndex(next);
+    if (shouldVirtualize) {
+      containerRef.current?.scrollTo({ top: Math.max(0, next * rowHeight - rowHeight * 2), behavior: "smooth" });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement) return;
+    if (["ArrowDown", "j"].includes(e.key)) {
+      e.preventDefault();
+      focusRow(activeIndex + 1);
+    }
+    if (["ArrowUp", "k"].includes(e.key)) {
+      e.preventDefault();
+      focusRow(activeIndex - 1);
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const row = data[activeIndex];
+      if (row) onRowClick?.(row);
+    }
+    if (e.key === " " && selectable) {
+      e.preventDefault();
+      const row = data[activeIndex];
+      if (row) onSelect?.(row.id);
+    }
+  };
+
   if (data.length === 0) {
     return <EmptyState title={emptyMessage} description={emptyDescription} />;
   }
@@ -56,7 +111,20 @@ export function DenseGrid<T extends { id: string }>({
     : columns;
 
   return (
-    <div className={cn("overflow-auto scrollbar-thin page-surface", className)} role="grid" aria-rowcount={data.length}>
+    <div
+      ref={containerRef}
+      className={cn("overflow-auto scrollbar-thin page-surface focus-ring", className)}
+      role="grid"
+      aria-rowcount={data.length}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onScroll={(e) => shouldVirtualize && setScrollTop(e.currentTarget.scrollTop)}
+      style={shouldVirtualize ? { maxHeight: viewportHeight } : undefined}
+    >
+      <div className="px-3 py-2 text-xs font-bold text-muted border-b border-border bg-white">
+        {shouldVirtualize ? `Optimized grid: showing ${visibleRange.start + 1}-${visibleRange.end} of ${data.length}. ` : ""}
+        Use ↑/↓ or j/k to move, Enter to open{selectable ? ", Space to select" : ""}.
+      </div>
       <table className="w-full border-collapse" style={{ fontSize: "var(--fs)" }}>
         <thead className="sticky top-0 z-10 bg-cream/95 backdrop-blur-sm border-b-2 border-border">
           <tr role="row">
@@ -91,7 +159,14 @@ export function DenseGrid<T extends { id: string }>({
           </tr>
         </thead>
         <tbody>
-          {data.map((row, idx) => (
+          {shouldVirtualize && visibleRange.topPad > 0 && (
+            <tr aria-hidden>
+              <td colSpan={cols.length + (selectable ? 1 : 0)} style={{ height: visibleRange.topPad, padding: 0 }} />
+            </tr>
+          )}
+          {visibleRows.map((row, visibleIdx) => {
+            const idx = visibleRange.start + visibleIdx;
+            return (
             <tr
               key={row.id}
               role="row"
@@ -101,10 +176,13 @@ export function DenseGrid<T extends { id: string }>({
                 "group border-b border-border/80 transition-colors",
                 onRowClick && "cursor-pointer hover:bg-primary/10",
                 idx % 2 === 1 ? "bg-cream/25" : "bg-white",
-                focusedIndex === idx && "bg-cream",
+                activeIndex === idx && "bg-cream outline outline-2 outline-primary/50",
                 selectedIds.has(row.id) && "bg-primary/20"
               )}
-              onClick={() => onRowClick?.(row)}
+              onClick={() => {
+                setActiveIndex(idx);
+                onRowClick?.(row);
+              }}
             >
               {selectable && (
                 <td className="grid-cell" role="gridcell" onClick={(e) => e.stopPropagation()}>
@@ -140,7 +218,12 @@ export function DenseGrid<T extends { id: string }>({
                 </td>
               ))}
             </tr>
-          ))}
+          );})}
+          {shouldVirtualize && visibleRange.bottomPad > 0 && (
+            <tr aria-hidden>
+              <td colSpan={cols.length + (selectable ? 1 : 0)} style={{ height: visibleRange.bottomPad, padding: 0 }} />
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
