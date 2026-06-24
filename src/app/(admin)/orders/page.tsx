@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { DenseGrid, type Column } from "@/components/ui/dense-grid";
-import { Drawer, FilterBar, PageHeader, StatusDot, SourceBadge, TabBar, BtnPrimary, LabeledFilterSelect, StatCards } from "@/components/ui/shared";
+import { Drawer, FilterBar, PageHeader, StatusDot, SourceBadge, TabBar, BtnPrimary, BtnSecondary, LabeledFilterSelect, StatCards } from "@/components/ui/shared";
 import { FormField, inputClass, selectClass } from "@/components/ui/forms";
 import { formatCurrency, cn } from "@/lib/utils";
 import { apiFetch, useToast } from "@/lib/toast";
@@ -19,7 +19,7 @@ const DEFAULT_PERIOD = "week";
 interface OrderRow {
   id: string; number: string; source: string; status: string; total: number;
   tableLabel: string | null; createdAt: string;
-  items?: { id: string; name: string; quantity: number; price: number; status: string }[];
+  items?: { id: string; itemId?: string | null; name: string; quantity: number; price: number; status: string }[];
   _count: { items: number };
 }
 
@@ -60,6 +60,8 @@ interface OrderConfig {
   counter: boolean;
   qr: boolean;
   requireCancelReason: boolean;
+  allowCancelPreparing: boolean;
+  cancelPreparingRestores: boolean;
 }
 
 interface KdsConfig {
@@ -67,17 +69,40 @@ interface KdsConfig {
   blueOrange: number;
   orangeRed: number;
   audioOnRed: boolean;
+  stationRouting: boolean;
+  undoBumpSec: number;
+}
+
+interface StateMachineConfig {
+  autoConfirm: boolean;
+  autoPrepareDelayMin: number;
+  staleAutoCancelMin: number;
+}
+
+interface QrConfig {
+  enabled: boolean;
+  requirePhone: boolean;
+  loyaltyPrompt: boolean;
+  allowAnonymous: boolean;
+  cartPreservationMin: number;
+  showEstWait: boolean;
 }
 
 interface ReceiptConfig {
   footerText: string;
   autoPrint: boolean;
   showGstin: boolean;
+  feedbackQr: boolean;
+  printerName: string;
 }
 
-const DEFAULT_ORDER_CONFIG: OrderConfig = { dineIn: true, takeaway: true, counter: true, qr: true, requireCancelReason: true };
-const DEFAULT_KDS_CONFIG: KdsConfig = { enabled: false, blueOrange: 15, orangeRed: 20, audioOnRed: true };
-const DEFAULT_RECEIPT_CONFIG: ReceiptConfig = { footerText: "Thank you for dining with us!", autoPrint: true, showGstin: true };
+interface Station { id: string; name: string; itemIds: string; }
+
+const DEFAULT_ORDER_CONFIG: OrderConfig = { dineIn: true, takeaway: true, counter: true, qr: true, requireCancelReason: true, allowCancelPreparing: true, cancelPreparingRestores: false };
+const DEFAULT_KDS_CONFIG: KdsConfig = { enabled: false, blueOrange: 15, orangeRed: 20, audioOnRed: true, stationRouting: false, undoBumpSec: 10 };
+const DEFAULT_STATE_MACHINE: StateMachineConfig = { autoConfirm: false, autoPrepareDelayMin: 0, staleAutoCancelMin: 0 };
+const DEFAULT_QR_CONFIG: QrConfig = { enabled: true, requirePhone: false, loyaltyPrompt: true, allowAnonymous: true, cartPreservationMin: 30, showEstWait: true };
+const DEFAULT_RECEIPT_CONFIG: ReceiptConfig = { footerText: "Thank you for dining with us!", autoPrint: true, showGstin: true, feedbackQr: true, printerName: "" };
 
 export default function OrdersPage() {
   return (
@@ -107,7 +132,12 @@ function OrdersPageContent() {
   const [cancelReason, setCancelReason] = useState("");
   const [orderConfig, setOrderConfig] = useState<OrderConfig>(DEFAULT_ORDER_CONFIG);
   const [kdsConfig, setKdsConfig] = useState<KdsConfig>(DEFAULT_KDS_CONFIG);
+  const [stateMachine, setStateMachine] = useState<StateMachineConfig>(DEFAULT_STATE_MACHINE);
+  const [qrConfig, setQrConfig] = useState<QrConfig>(DEFAULT_QR_CONFIG);
   const [receiptConfig, setReceiptConfig] = useState<ReceiptConfig>(DEFAULT_RECEIPT_CONFIG);
+  const [stations, setStations] = useState<Station[]>([]);
+  const [stationItems, setStationItems] = useState<{ id: string; name: string }[]>([]);
+  const [newStation, setNewStation] = useState("");
 
   const hasActiveFilters = !!(search || statusFilter || sourceFilter || periodFilter !== DEFAULT_PERIOD || tableFilter);
   const currentFilters = { search, statusFilter, sourceFilter, periodFilter, tableFilter };
@@ -135,14 +165,33 @@ function OrdersPageContent() {
   }, [load, toast]);
 
   useEffect(() => {
-    apiFetch<{ orderControls?: Partial<OrderConfig>; kds?: Partial<KdsConfig>; receipt?: Partial<ReceiptConfig> }>("/api/admin-config?scope=orders")
+    apiFetch<{ orderControls?: Partial<OrderConfig>; kds?: Partial<KdsConfig>; receipt?: Partial<ReceiptConfig>; stateMachine?: Partial<StateMachineConfig>; qrOrdering?: Partial<QrConfig> }>("/api/admin-config?scope=orders")
       .then((config) => {
         setOrderConfig({ ...DEFAULT_ORDER_CONFIG, ...config.orderControls });
         setKdsConfig({ ...DEFAULT_KDS_CONFIG, ...config.kds });
         setReceiptConfig({ ...DEFAULT_RECEIPT_CONFIG, ...config.receipt });
+        setStateMachine({ ...DEFAULT_STATE_MACHINE, ...config.stateMachine });
+        setQrConfig({ ...DEFAULT_QR_CONFIG, ...config.qrOrdering });
       })
       .catch(() => {});
   }, []);
+
+  const loadStations = useCallback(async () => {
+    const data = await apiFetch<{ stations: Station[]; items: { id: string; name: string }[] }>("/api/orders?stations=1");
+    setStations(data.stations); setStationItems(data.items);
+  }, []);
+  useEffect(() => { loadStations().catch(() => {}); }, [loadStations]);
+
+  const saveStation = async (id: string | null, name: string, itemIds: string[]) => {
+    try { await apiFetch("/api/orders", { method: "PATCH", body: JSON.stringify({ type: "station", id: id ?? undefined, name, itemIds }) }); toast("Station saved"); loadStations(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
+  };
+  const deleteStation = async (id: string) => { try { await apiFetch(`/api/orders?stationId=${id}`, { method: "DELETE" }); toast("Station removed"); loadStations(); } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); } };
+  const toggleStationItem = (st: Station, itemId: string) => {
+    const ids = (() => { try { return JSON.parse(st.itemIds) as string[]; } catch { return []; } })();
+    saveStation(st.id, st.name, ids.includes(itemId) ? ids.filter((x) => x !== itemId) : [...ids, itemId]);
+  };
+  const stationsForItem = useCallback((itemId: string) => stations.filter((s) => { try { return (JSON.parse(s.itemIds) as string[]).includes(itemId); } catch { return false; } }), [stations]);
 
   useInterval(() => {
     if (liveMode && tab === "list") {
@@ -200,7 +249,7 @@ function OrdersPageContent() {
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
   };
 
-  const saveOrderConfig = async (key: string, value: OrderConfig | KdsConfig | ReceiptConfig, message: string) => {
+  const saveOrderConfig = async (key: string, value: OrderConfig | KdsConfig | ReceiptConfig | StateMachineConfig | QrConfig, message: string) => {
     try {
       await apiFetch("/api/admin-config", {
         method: "PATCH",
@@ -250,7 +299,7 @@ function OrdersPageContent() {
           </button>
         }
       />
-      <TabBar tabs={[{ id: "list", label: "Live Orders" }, { id: "config", label: "Order Controls" }, { id: "kds", label: "KDS Settings" }, { id: "receipt", label: "Receipt Config" }]} active={tab} onChange={setTab} />
+      <TabBar tabs={[{ id: "list", label: "Live Orders" }, { id: "config", label: "Order Controls" }, { id: "statemachine", label: "State Machine" }, { id: "kds", label: "KDS & Stations" }, { id: "qr", label: "QR Ordering" }, { id: "receipt", label: "Receipt Config" }]} active={tab} onChange={setTab} />
 
       {tab === "list" && (
         <>
@@ -345,26 +394,76 @@ function OrdersPageContent() {
 
       {tab === "config" && (
         <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          {([
-            ["dineIn", "Dine-In"],
-            ["takeaway", "Takeaway"],
-            ["counter", "Counter"],
-            ["qr", "QR Ordering"],
-            ["requireCancelReason", "Require cancel reason"],
-          ] as const).map(([key, label]) => (
+          <h3 className="font-bold text-black">Order types</h3>
+          {([["dineIn", "Dine-In"], ["takeaway", "Takeaway"], ["counter", "Counter"], ["qr", "QR Ordering"]] as const).map(([key, label]) => (
+            <label key={key} className="flex justify-between font-bold text-black"><span>{label}</span><input type="checkbox" checked={orderConfig[key]} onChange={(e) => setOrderConfig({ ...orderConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          ))}
+          <h3 className="font-bold text-black pt-2 border-t border-border">Modification & cancellation policy</h3>
+          {([["requireCancelReason", "Require cancellation reason"], ["allowCancelPreparing", "Allow cancel once Preparing (manager)"], ["cancelPreparingRestores", "Restore stock when Preparing order cancelled"]] as const).map(([key, label]) => (
             <label key={key} className="flex justify-between font-bold text-black"><span>{label}</span><input type="checkbox" checked={orderConfig[key]} onChange={(e) => setOrderConfig({ ...orderConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
           ))}
           <BtnPrimary onClick={() => saveOrderConfig("orderControls", orderConfig, "Order controls saved")}><Save size={18} /> Save Settings</BtnPrimary>
         </div>
       )}
 
-      {tab === "kds" && (
+      {tab === "statemachine" && (
         <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          <label className="flex justify-between font-bold"><span>KDS Enabled</span><input type="checkbox" checked={kdsConfig.enabled} onChange={(e) => setKdsConfig({ ...kdsConfig, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-          <label className="flex justify-between font-bold"><span>Blue → Orange (min)</span><input type="number" className="w-20 border-2 rounded-lg px-2 py-1" value={kdsConfig.blueOrange} onChange={(e) => setKdsConfig({ ...kdsConfig, blueOrange: Number(e.target.value) })} /></label>
-          <label className="flex justify-between font-bold"><span>Orange → Red (min)</span><input type="number" className="w-20 border-2 rounded-lg px-2 py-1" value={kdsConfig.orangeRed} onChange={(e) => setKdsConfig({ ...kdsConfig, orangeRed: Number(e.target.value) })} /></label>
-          <label className="flex justify-between font-bold"><span>Audio on red</span><input type="checkbox" checked={kdsConfig.audioOnRed} onChange={(e) => setKdsConfig({ ...kdsConfig, audioOnRed: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-          <BtnPrimary onClick={() => saveOrderConfig("kds", kdsConfig, "KDS settings saved")}><Save size={18} /> Save</BtnPrimary>
+          <p className="text-sm text-muted font-medium">Automations for the order lifecycle. Invalid transitions are always rejected regardless of these settings.</p>
+          <label className="flex justify-between font-bold"><span>Auto-confirm new orders</span><input type="checkbox" checked={stateMachine.autoConfirm} onChange={(e) => setStateMachine({ ...stateMachine, autoConfirm: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <label className="flex justify-between font-bold items-center"><span>Auto-prepare delay (min, 0 = off)</span><input type="number" className="w-24 h-10 px-2 border-2 border-border rounded-lg" value={stateMachine.autoPrepareDelayMin} onChange={(e) => setStateMachine({ ...stateMachine, autoPrepareDelayMin: Number(e.target.value) })} /></label>
+          <label className="flex justify-between font-bold items-center"><span>Stale auto-cancel (min, 0 = off)</span><input type="number" className="w-24 h-10 px-2 border-2 border-border rounded-lg" value={stateMachine.staleAutoCancelMin} onChange={(e) => setStateMachine({ ...stateMachine, staleAutoCancelMin: Number(e.target.value) })} /></label>
+          <BtnPrimary onClick={() => saveOrderConfig("stateMachine", stateMachine, "State machine saved")}><Save size={18} /> Save</BtnPrimary>
+        </div>
+      )}
+
+      {tab === "qr" && (
+        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
+          {([["enabled", "QR ordering enabled"], ["requirePhone", "Require phone verification"], ["loyaltyPrompt", "Show loyalty prompt"], ["allowAnonymous", "Allow anonymous orders"], ["showEstWait", "Show estimated wait"]] as const).map(([key, label]) => (
+            <label key={key} className="flex justify-between font-bold"><span>{label}</span><input type="checkbox" checked={qrConfig[key]} onChange={(e) => setQrConfig({ ...qrConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          ))}
+          <label className="flex justify-between font-bold items-center"><span>Cart preservation (min)</span><input type="number" className="w-24 h-10 px-2 border-2 border-border rounded-lg" value={qrConfig.cartPreservationMin} onChange={(e) => setQrConfig({ ...qrConfig, cartPreservationMin: Number(e.target.value) })} /></label>
+          <BtnPrimary onClick={() => saveOrderConfig("qrOrdering", qrConfig, "QR ordering saved")}><Save size={18} /> Save</BtnPrimary>
+        </div>
+      )}
+
+      {tab === "kds" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
+            <h3 className="font-bold text-black">KDS settings</h3>
+            <label className="flex justify-between font-bold"><span>KDS Enabled</span><input type="checkbox" checked={kdsConfig.enabled} onChange={(e) => setKdsConfig({ ...kdsConfig, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label className="flex justify-between font-bold items-center"><span>Blue → Orange (min)</span><input type="number" className="w-20 border-2 border-border rounded-lg px-2 py-1" value={kdsConfig.blueOrange} onChange={(e) => setKdsConfig({ ...kdsConfig, blueOrange: Number(e.target.value) })} /></label>
+            <label className="flex justify-between font-bold items-center"><span>Orange → Red (min)</span><input type="number" className="w-20 border-2 border-border rounded-lg px-2 py-1" value={kdsConfig.orangeRed} onChange={(e) => setKdsConfig({ ...kdsConfig, orangeRed: Number(e.target.value) })} /></label>
+            <label className="flex justify-between font-bold"><span>Audio on red</span><input type="checkbox" checked={kdsConfig.audioOnRed} onChange={(e) => setKdsConfig({ ...kdsConfig, audioOnRed: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label className="flex justify-between font-bold"><span>Station routing</span><input type="checkbox" checked={kdsConfig.stationRouting} onChange={(e) => setKdsConfig({ ...kdsConfig, stationRouting: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label className="flex justify-between font-bold items-center"><span>Undo-bump window (sec)</span><input type="number" className="w-20 border-2 border-border rounded-lg px-2 py-1" value={kdsConfig.undoBumpSec} onChange={(e) => setKdsConfig({ ...kdsConfig, undoBumpSec: Number(e.target.value) })} /></label>
+            <BtnPrimary onClick={() => saveOrderConfig("kds", kdsConfig, "KDS settings saved")}><Save size={18} /> Save</BtnPrimary>
+          </div>
+
+          <div className="bg-white border-2 border-border rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-black">Stations <span className="text-xs text-muted">(head-chef view: {stations.length} stations · {stationItems.length} items)</span></h3>
+            </div>
+            <div className="flex gap-2">
+              <input className={inputClass} placeholder="New station (e.g. Tandoor)" value={newStation} onChange={(e) => setNewStation(e.target.value)} />
+              <BtnSecondary onClick={() => { if (newStation.trim()) { saveStation(null, newStation, []); setNewStation(""); } }}>Add</BtnSecondary>
+            </div>
+            {stations.map((st) => {
+              const ids = (() => { try { return JSON.parse(st.itemIds) as string[]; } catch { return []; } })();
+              return (
+                <div key={st.id} className="p-3 border-2 border-border rounded-xl bg-cream/40">
+                  <div className="flex items-center justify-between mb-2"><span className="font-bold">{st.name} <span className="text-xs text-muted">({ids.length} items)</span></span>
+                    <button type="button" onClick={() => deleteStation(st.id)} className="text-red-600 text-sm font-bold underline">Remove</button></div>
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-auto">
+                    {stationItems.map((it) => (
+                      <button key={it.id} type="button" onClick={() => toggleStationItem(st, it.id)}
+                        className={cn("px-2 py-1 rounded-lg text-xs font-bold border-2", ids.includes(it.id) ? "bg-primary border-primary" : "border-border bg-white text-muted")}>{it.name}</button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {stations.length === 0 && <p className="text-sm text-muted font-semibold">No stations. Unassigned items appear on all stations.</p>}
+          </div>
         </div>
       )}
 
@@ -373,6 +472,8 @@ function OrdersPageContent() {
           <FormField label="Footer Text"><textarea className={`${inputClass} min-h-24`} value={receiptConfig.footerText} onChange={(e) => setReceiptConfig({ ...receiptConfig, footerText: e.target.value })} /></FormField>
           <label className="flex justify-between font-bold"><span>Auto-print receipts</span><input type="checkbox" checked={receiptConfig.autoPrint} onChange={(e) => setReceiptConfig({ ...receiptConfig, autoPrint: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
           <label className="flex justify-between font-bold"><span>Show GSTIN/FSSAI</span><input type="checkbox" checked={receiptConfig.showGstin} onChange={(e) => setReceiptConfig({ ...receiptConfig, showGstin: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <label className="flex justify-between font-bold"><span>Feedback QR on receipt</span><input type="checkbox" checked={receiptConfig.feedbackQr} onChange={(e) => setReceiptConfig({ ...receiptConfig, feedbackQr: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <FormField label="Thermal printer (per location)"><input className={inputClass} placeholder="Printer name / IP" value={receiptConfig.printerName} onChange={(e) => setReceiptConfig({ ...receiptConfig, printerName: e.target.value })} /></FormField>
           <BtnPrimary onClick={() => saveOrderConfig("receipt", receiptConfig, "Receipt config saved")}><Save size={18} /> Save</BtnPrimary>
         </div>
       )}
@@ -387,11 +488,23 @@ function OrdersPageContent() {
               <div><dt className="text-muted font-bold">Time</dt><dd className="font-bold">{format(new Date(detail.createdAt), "dd MMM HH:mm")}</dd></div>
             </dl>
             <h3 className="font-bold">Items</h3>
-            <ul className="space-y-2">{detail.items?.map((i) => (
-              <li key={i.id} className="flex justify-between p-2 bg-cream rounded-lg font-medium">
-                <span>{i.quantity}× {i.name}</span><span>{formatCurrency(i.price * i.quantity)}</span>
-              </li>
-            ))}</ul>
+            <ul className="space-y-2">{detail.items?.map((i) => {
+              const itemStations = i.itemId ? stationsForItem(i.itemId) : [];
+              const cancelled = i.status === "cancelled";
+              return (
+                <li key={i.id} className={cn("flex justify-between items-center p-2 bg-cream rounded-lg font-medium", cancelled && "opacity-60")}>
+                  <span className={cn("flex items-center gap-2", cancelled && "line-through")}>
+                    {i.quantity}× {i.name}
+                    {kdsConfig.stationRouting && itemStations.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-border font-bold">
+                        {itemStations.length === 1 ? itemStations[0].name : `${itemStations.length} stations`}
+                      </span>
+                    )}
+                  </span>
+                  <span>{formatCurrency(i.price * i.quantity)}</span>
+                </li>
+              );
+            })}</ul>
             <FormField label="Update Status"><select className={selectClass} value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
               {["pending", "confirmed", "preparing", "ready", "served", "cancelled"].map((s) => <option key={s} value={s}>{s}</option>)}
             </select></FormField>

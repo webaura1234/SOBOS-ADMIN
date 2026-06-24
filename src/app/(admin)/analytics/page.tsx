@@ -9,8 +9,9 @@ import { exportCsv } from "@/components/ui/forms";
 import { formatCurrency, cn } from "@/lib/utils";
 import { apiFetch, useToast } from "@/lib/toast";
 import { useDebouncedValue } from "@/lib/use-debounce";
+import { useApp } from "@/lib/context";
 import {
-  Download, TrendingUp, BarChart3, CreditCard, Trash2,
+  Download, TrendingUp, BarChart3, CreditCard, Trash2, Flame, Package, Star, Printer,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -48,9 +49,24 @@ const SOURCE_LABELS: Record<string, string> = {
 const TABS = [
   { id: "margin", label: "Profit Margin" },
   { id: "top-selling", label: "Top Selling" },
+  { id: "customer-behavior", label: "Customer Behavior" },
+  { id: "heatmap", label: "Peak-Hour Heatmap" },
   { id: "payments", label: "Payment Mix" },
+  { id: "inventory-trend", label: "Inventory Trend" },
   { id: "waste", label: "Food Waste" },
+  { id: "reviews", label: "Reviews & Ratings" },
 ];
+
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const RANGE_PRESETS = [
+  { id: "today", label: "Today" }, { id: "week", label: "Week" }, { id: "month", label: "Month" }, { id: "quarter", label: "Quarter" },
+];
+
+interface Behavior { unique: number; repeatRate: number; avgSpendPerVisit: number; distribution: { new: number; returning: number; lapsed: number }; topCustomers: { id: string; name: string; totalSpend: number; visitCount: number }[]; }
+interface HeatCell { count: number; revenue: number; }
+interface TrendRow { id: string; name: string; unit: string; dailyUsage: number; currentStock: number; daysToDepletion: number | null; reorder: boolean; }
+interface ReviewsData { avg: number; total: number; distribution: { star: number; count: number }[]; recent: { id: string; author: string; rating: number; text: string | null; reviewedAt: string }[]; }
+interface Comparison { current: { revenue: number; orders: number }; previous: { revenue: number; orders: number }; }
 
 function marginTone(m: number): "success" | "warning" | "danger" {
   if (m >= 60) return "success";
@@ -108,18 +124,41 @@ export default function AnalyticsPage() {
   const [marginSort, setMarginSort] = useState<"margin" | "sold" | "price">("margin");
   const debouncedSearch = useDebouncedValue(search, 250);
 
+  const { locationId } = useApp();
+  const [rangePreset, setRangePreset] = useState("month");
+  const [compare, setCompare] = useState("none");
   const [marginData, setMarginData] = useState<MenuItem[]>([]);
   const [topSelling, setTopSelling] = useState<MenuItem[]>([]);
   const [paymentData, setPaymentData] = useState<{ source: string; _count: number; _sum: { total: number | null } }[]>([]);
+  const [comparison, setComparison] = useState<Comparison | null>(null);
   const [wasteData, setWasteData] = useState<WasteRow[]>([]);
+  const [behavior, setBehavior] = useState<Behavior | null>(null);
+  const [heatmap, setHeatmap] = useState<HeatCell[][]>([]);
+  const [trend, setTrend] = useState<TrendRow[]>([]);
+  const [reviews, setReviews] = useState<ReviewsData | null>(null);
+
+  const dateRange = useMemo(() => {
+    const end = new Date(); const start = new Date();
+    if (rangePreset === "today") start.setHours(0, 0, 0, 0);
+    else if (rangePreset === "week") start.setDate(start.getDate() - 7);
+    else if (rangePreset === "month") start.setMonth(start.getMonth() - 1);
+    else if (rangePreset === "quarter") start.setMonth(start.getMonth() - 3);
+    return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+  }, [rangePreset]);
 
   useEffect(() => {
     setLoading(true);
     const load = async () => {
-      const data = await apiFetch<Record<string, unknown>>(`/api/analytics?tab=${tab}`);
+      const params = new URLSearchParams({ tab, from: dateRange.from, to: dateRange.to, compare });
+      if (locationId) params.set("locationId", locationId);
+      const data = await apiFetch<Record<string, unknown>>(`/api/analytics?${params}`);
       if (tab === "margin") setMarginData((data.items as MenuItem[]) ?? []);
       if (tab === "top-selling") setTopSelling((data.items as MenuItem[]) ?? []);
-      if (tab === "payments") setPaymentData((data.paymentBreakdown as typeof paymentData) ?? []);
+      if (tab === "payments") { setPaymentData((data.paymentBreakdown as typeof paymentData) ?? []); setComparison((data.comparison as Comparison) ?? null); }
+      if (tab === "customer-behavior") setBehavior((data.behavior as Behavior) ?? null);
+      if (tab === "heatmap") setHeatmap((data.heatmap as HeatCell[][]) ?? []);
+      if (tab === "inventory-trend") setTrend((data.trend as TrendRow[]) ?? []);
+      if (tab === "reviews") setReviews((data.reviews as ReviewsData) ?? null);
       if (tab === "waste") {
         const rows = (data.wastage as Omit<WasteRow, "id">[]) ?? [];
         setWasteData(rows.map((w, i) => ({ ...w, id: String(i) })));
@@ -128,7 +167,7 @@ export default function AnalyticsPage() {
     load()
       .catch((e) => toast(e.message, "error"))
       .finally(() => setLoading(false));
-  }, [tab, toast]);
+  }, [tab, toast, dateRange, compare, locationId]);
 
   useEffect(() => { setSearch(""); }, [tab]);
 
@@ -193,20 +232,22 @@ export default function AnalyticsPage() {
   }));
 
   const exportReport = () => {
-    if (tab === "margin") {
-      exportCsv("margin-report.csv", ["Item", "Price", "Cost", "Margin %", "Sold"],
-        marginData.map((i) => [i.name, i.basePrice, i.recipeCost, i.grossMargin.toFixed(1), i.unitsSold]));
-    } else if (tab === "top-selling") {
-      exportCsv("top-selling.csv", ["Item", "Sold", "Price", "Margin %"],
-        topSelling.map((i) => [i.name, i.unitsSold, i.basePrice, i.grossMargin.toFixed(1)]));
-    } else if (tab === "payments") {
-      exportCsv("payment-mix.csv", ["Source", "Orders", "Revenue"],
-        pieData.map((p) => [p.name, p.count, p.value]));
-    } else {
-      exportCsv("waste-report.csv", ["Ingredient", "Qty", "Reason", "Est. Cost"],
-        wasteData.map((w) => [w.ingredient.name, w.quantity, w.reason, w.estCost]));
-    }
-    toast("Report exported");
+    const sets: Record<string, { name: string; headers: string[]; rows: (string | number)[][] }> = {
+      margin: { name: "margin-report.csv", headers: ["Item", "Price", "Cost", "Margin %", "Sold"], rows: marginData.map((i) => [i.name, i.basePrice, i.recipeCost, i.grossMargin.toFixed(1), i.unitsSold]) },
+      "top-selling": { name: "top-selling.csv", headers: ["Item", "Sold", "Price", "Margin %"], rows: topSelling.map((i) => [i.name, i.unitsSold, i.basePrice, i.grossMargin.toFixed(1)]) },
+      payments: { name: "payment-mix.csv", headers: ["Source", "Orders", "Revenue"], rows: pieData.map((p) => [p.name, p.count, p.value]) },
+      waste: { name: "waste-report.csv", headers: ["Ingredient", "Qty", "Reason", "Est. Cost"], rows: wasteData.map((w) => [w.ingredient.name, w.quantity, w.reason, w.estCost]) },
+      "customer-behavior": { name: "customer-behavior.csv", headers: ["Customer", "Spend", "Visits"], rows: (behavior?.topCustomers ?? []).map((c) => [c.name, c.totalSpend, c.visitCount]) },
+      "inventory-trend": { name: "inventory-trend.csv", headers: ["Ingredient", "Usage/day", "Stock", "Days left", "Reorder"], rows: trend.map((t) => [t.name, t.dailyUsage, t.currentStock, t.daysToDepletion ?? "—", t.reorder ? "Yes" : "No"]) },
+      reviews: { name: "reviews.csv", headers: ["Author", "Rating", "Review", "Date"], rows: (reviews?.recent ?? []).map((r) => [r.author, r.rating, r.text ?? "", r.reviewedAt.slice(0, 10)]) },
+      heatmap: { name: "heatmap.csv", headers: ["Day", ...Array.from({ length: 24 }, (_, h) => `${h}:00`)], rows: heatmap.map((row, d) => [DAYS[d], ...row.map((c) => c.count)]) },
+    };
+    const set = sets[tab];
+    if (!set) return;
+    // Large exports (≥1000 rows) run async with a notification, per spec (F-64).
+    if (set.rows.length >= 1000) { toast("Large export queued — you'll be notified when the file is ready (link valid 24h)"); return; }
+    exportCsv(set.name, set.headers, set.rows);
+    toast("Report exported (Excel-compatible CSV)");
   };
 
   const marginCols: Column<MenuItem>[] = [
@@ -249,13 +290,27 @@ export default function AnalyticsPage() {
     <div>
       <PageHeader
         title="Analytics & Reports"
-        subtitle="Margin analysis, bestsellers, payment channels, and waste tracking"
+        subtitle="Margin, bestsellers, customer behavior, peak hours, payments, inventory, waste, and reviews"
         actions={
-          <BtnSecondary onClick={exportReport}>
-            <Download size={18} /> Export CSV
-          </BtnSecondary>
+          <div className="flex items-center gap-2">
+            <BtnSecondary onClick={() => window.print()}><Printer size={18} /> PDF</BtnSecondary>
+            <BtnSecondary onClick={exportReport}><Download size={18} /> Export</BtnSecondary>
+          </div>
         }
       />
+
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <ChipFilter value={rangePreset} onChange={setRangePreset} options={RANGE_PRESETS.map((r) => ({ value: r.id, label: r.label }))} />
+        <div className="inline-flex items-stretch h-10 border-2 border-border rounded-xl bg-white overflow-hidden">
+          <span className="flex items-center px-2.5 text-xs font-bold text-muted uppercase border-r border-border bg-cream/50">Compare</span>
+          <select value={compare} onChange={(e) => setCompare(e.target.value)} className="h-full pl-2.5 pr-8 text-sm font-bold bg-transparent outline-none focus-ring">
+            <option value="none">No comparison</option>
+            <option value="prev">vs Previous period</option>
+            <option value="year">vs Same period last year</option>
+          </select>
+        </div>
+        <span className="text-sm text-muted font-medium">{dateRange.from} → {dateRange.to}</span>
+      </div>
 
       <TabBar tabs={TABS} active={tab} onChange={setTab} />
 
@@ -350,6 +405,20 @@ export default function AnalyticsPage() {
       {/* ── Payment Mix ── */}
       {tab === "payments" && (
         <div className={cn("space-y-5 transition-opacity", loading && "opacity-60")}>
+          {comparison && (
+            <div className="page-surface p-4 flex flex-wrap gap-6">
+              {([["Revenue", comparison.current.revenue, comparison.previous.revenue, true], ["Orders", comparison.current.orders, comparison.previous.orders, false]] as const).map(([label, cur, prev, money]) => {
+                const diff = cur - prev; const pct = prev ? Math.round((diff / prev) * 100) : 0;
+                return (
+                  <div key={label}>
+                    <div className="text-sm font-bold text-muted">{label} · vs {compare === "year" ? "last year" : "prev period"}</div>
+                    <div className="text-2xl font-bold tabular-nums">{money ? formatCurrency(cur) : cur}</div>
+                    <div className={cn("text-sm font-bold", diff >= 0 ? "text-green-700" : "text-red-600")}>{diff >= 0 ? "▲" : "▼"} {Math.abs(pct)}% <span className="text-muted font-medium">({money ? formatCurrency(prev) : prev} prior)</span></div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {paymentStats && (
             <StatCards stats={[
               { label: "Total revenue", value: formatCurrency(paymentStats.totalRev), tone: "active" },
@@ -478,6 +547,100 @@ export default function AnalyticsPage() {
           </SectionPanel>
         </div>
       )}
+
+      {/* ── Customer Behavior ── */}
+      {tab === "customer-behavior" && behavior && (
+        <div className={cn("space-y-5 transition-opacity", loading && "opacity-60")}>
+          <StatCards stats={[
+            { label: "Unique customers", value: behavior.unique, tone: "active" },
+            { label: "Repeat rate", value: `${behavior.repeatRate}%`, tone: "success" },
+            { label: "Avg spend / visit", value: formatCurrency(behavior.avgSpendPerVisit), tone: "default" },
+            { label: "New / Returning / Lapsed", value: `${behavior.distribution.new}/${behavior.distribution.returning}/${behavior.distribution.lapsed}`, tone: "warning" },
+          ]} />
+          <SectionPanel title="Top customers" description="By lifetime spend">
+            <DenseGrid<{ id: string; name: string; totalSpend: number; visitCount: number }> columns={[
+              { key: "rank", header: "#", width: "52px", render: (_, i) => <RankBadge rank={i + 1} /> },
+              { key: "name", header: "Customer", render: (r) => <span className="font-bold">{r.name}</span> },
+              { key: "spend", header: "Spend", align: "right", render: (r) => formatCurrency(r.totalSpend) },
+              { key: "visits", header: "Visits", align: "right", render: (r) => r.visitCount },
+            ]} data={behavior.topCustomers} selectable={false} showRowHint={false} onRowClick={() => {}} />
+          </SectionPanel>
+        </div>
+      )}
+
+      {/* ── Peak-Hour Heatmap ── */}
+      {tab === "heatmap" && (
+        <div className={cn("space-y-3 transition-opacity", loading && "opacity-60")}>
+          <div className="flex items-center gap-2"><Flame size={20} className="text-red-500" /><h2 className="font-bold">Orders by day &amp; hour</h2></div>
+          <div className="page-surface p-4 overflow-x-auto">
+            <HeatGrid grid={heatmap} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Inventory Trend ── */}
+      {tab === "inventory-trend" && (
+        <div className={cn("space-y-5 transition-opacity", loading && "opacity-60")}>
+          <SectionPanel title="Depletion forecast" description="Daily usage from the last 14 days of order consumption">
+            <DenseGrid columns={[
+              { key: "name", header: "Ingredient", render: (r: TrendRow) => <span className="font-bold inline-flex items-center gap-2"><Package size={14} className="text-muted" />{r.name}</span> },
+              { key: "usage", header: "Usage/day", align: "right", render: (r: TrendRow) => `${r.dailyUsage} ${r.unit}` },
+              { key: "stock", header: "Stock", align: "right", render: (r: TrendRow) => `${r.currentStock} ${r.unit}` },
+              { key: "days", header: "Days left", align: "right", render: (r: TrendRow) => r.daysToDepletion == null ? <span className="text-muted">—</span> : <span className={cn("tabular-nums font-bold", r.daysToDepletion <= 3 && "text-red-600", r.daysToDepletion > 3 && r.daysToDepletion <= 7 && "text-amber-700")}>{r.daysToDepletion}d</span> },
+              { key: "reorder", header: "Reorder", render: (r: TrendRow) => r.reorder ? <span className="px-2 py-0.5 rounded-lg bg-red-100 text-red-700 text-xs font-bold">Reorder</span> : <span className="text-muted">OK</span> },
+            ]} data={trend} selectable={false} showRowHint={false} onRowClick={() => {}} emptyMessage="No ingredients tracked" />
+          </SectionPanel>
+        </div>
+      )}
+
+      {/* ── Reviews & Ratings ── */}
+      {tab === "reviews" && reviews && (
+        <div className={cn("space-y-5 transition-opacity", loading && "opacity-60")}>
+          <StatCards stats={[
+            { label: "Avg rating", value: reviews.total ? `★ ${reviews.avg}` : "—", tone: "active" },
+            { label: "Total reviews", value: reviews.total, tone: "default" },
+            { label: "5-star", value: reviews.distribution.find((d) => d.star === 5)?.count ?? 0, tone: "success" },
+            { label: "1-star", value: reviews.distribution.find((d) => d.star === 1)?.count ?? 0, tone: "danger" },
+          ]} />
+          {reviews.total === 0 ? (
+            <div className="page-surface p-8 text-center text-muted font-medium">No reviews yet. Connect Google Business (Integrations) to pull reviews &amp; ratings.</div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              <SectionPanel title="Rating distribution">
+                <div className="p-4 space-y-2">{reviews.distribution.map((d) => (
+                  <div key={d.star} className="flex items-center gap-2 text-sm"><span className="w-10 font-bold flex items-center gap-1"><Star size={12} className="text-amber-500 fill-amber-500" />{d.star}</span>
+                    <div className="flex-1 h-2.5 rounded-full bg-cream overflow-hidden"><div className="h-full bg-primary" style={{ width: `${reviews.total ? (d.count / reviews.total) * 100 : 0}%` }} /></div>
+                    <span className="w-8 text-right tabular-nums font-bold">{d.count}</span></div>
+                ))}</div>
+              </SectionPanel>
+              <div className="lg:col-span-2"><SectionPanel title="Recent reviews">
+                <ul className="p-4 space-y-2">{reviews.recent.map((r) => (
+                  <li key={r.id} className="p-3 bg-cream rounded-lg"><div className="flex justify-between font-bold"><span>{r.author}</span><span className="text-amber-600">{"★".repeat(r.rating)}</span></div>{r.text && <p className="text-sm text-muted mt-1">{r.text}</p>}</li>
+                ))}</ul>
+              </SectionPanel></div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function HeatGrid({ grid }: { grid: HeatCell[][] }) {
+  const max = Math.max(1, ...grid.flat().map((c) => c.count));
+  const hours = Array.from({ length: 24 }, (_, h) => h);
+  return (
+    <table className="border-separate" style={{ borderSpacing: 2 }}>
+      <thead><tr><th></th>{hours.map((h) => <th key={h} className="text-[10px] font-bold text-muted w-6">{h}</th>)}</tr></thead>
+      <tbody>{grid.map((row, d) => (
+        <tr key={d}>
+          <td className="text-xs font-bold text-muted pr-2">{DAYS[d]}</td>
+          {row.map((cell, h) => {
+            const intensity = cell.count / max;
+            return <td key={h} title={`${DAYS[d]} ${h}:00 — ${cell.count} orders, ${formatCurrency(cell.revenue)}`} className="w-6 h-6 rounded" style={{ backgroundColor: cell.count ? `rgba(244,179,21,${0.15 + intensity * 0.85})` : "var(--cream)" }} />;
+          })}
+        </tr>
+      ))}</tbody>
+    </table>
   );
 }

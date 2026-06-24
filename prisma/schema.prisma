@@ -67,6 +67,14 @@ model OperatingHours {
   isClosed   Boolean  @default(false)
 }
 
+model HolidayClosure {
+  id         String   @id @default(cuid())
+  locationId String
+  date       DateTime
+  name       String
+  createdAt  DateTime @default(now())
+}
+
 model FeatureToggle {
   id           String     @id @default(cuid())
   restaurantId String
@@ -88,6 +96,8 @@ model User {
   phone        String
   status       String   @default("active")
   inviteStatus String   @default("accepted")
+  payRate      Float    @default(0)
+  payType      String   @default("hourly")
   lastActive   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -95,6 +105,17 @@ model User {
   attendance   Attendance[]
   auditLogs    AuditLog[] @relation("AuditActor")
   @@unique([restaurantId, phone])
+}
+
+model ShiftSwap {
+  id           String   @id @default(cuid())
+  slotId       String
+  requesterId  String
+  requesterName String
+  withName     String?
+  reason       String?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
 }
 
 model Role {
@@ -153,6 +174,7 @@ model MenuCategory {
   dietaryTag   String?
   icon         String?
   itemCount    Int      @default(0)
+  hiddenLocations String @default("[]")
   items        MenuItem[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -173,24 +195,73 @@ model MenuItem {
   prepTime       Int?
   taxCategory    String   @default("GST_5")
   availability   String   @default("available")
+  autoOutOfStock Boolean  @default(false)
   recipeCost     Float    @default(0)
   grossMargin    Float    @default(0)
+  marginAlertThreshold Float?
   unitsSold      Int      @default(0)
   photos         String   @default("[]")
   isDeleted      Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   variants       MenuItemVariant[]
+  modifierGroups ModifierGroup[]
+  substitutions  SubstitutionRule[]
   recipe         Recipe?
   orderItems     OrderItem[]
 }
 
 model MenuItemVariant {
-  id       String   @id @default(cuid())
-  itemId   String
-  item     MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  label    String
-  price    Float
+  id        String   @id @default(cuid())
+  itemId    String
+  item      MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  label     String
+  price     Float
+  recipeNote String?
+}
+
+model ModifierGroup {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  name      String
+  required  Boolean  @default(false)
+  minSelect Int      @default(0)
+  maxSelect Int      @default(1)
+  options   ModifierOption[]
+}
+
+model ModifierOption {
+  id         String   @id @default(cuid())
+  groupId    String
+  group      ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  label      String
+  priceDelta Float    @default(0)
+}
+
+model SubstitutionRule {
+  id                     String   @id @default(cuid())
+  itemId                 String
+  item                   MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  primaryIngredientId    String
+  primaryName            String
+  substituteIngredientId String
+  substituteName         String
+  ratio                  Float    @default(1)
+  requiresApproval       Boolean  @default(false)
+}
+
+model SeasonalSchedule {
+  id           String   @id @default(cuid())
+  restaurantId String
+  itemId       String?
+  categoryId   String?
+  name         String
+  startDate    DateTime
+  endDate      DateTime
+  recurring    Boolean  @default(false)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
 }
 
 model Recipe {
@@ -199,6 +270,17 @@ model Recipe {
   item     MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   version  Int      @default(1)
   ingredients RecipeIngredient[]
+  snapshots   RecipeVersionSnapshot[]
+}
+
+model RecipeVersionSnapshot {
+  id              String   @id @default(cuid())
+  recipeId        String
+  recipe          Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  version         Int
+  ingredientsJson String
+  recipeCost      Float    @default(0)
+  createdAt       DateTime @default(now())
 }
 
 model RecipeIngredient {
@@ -219,11 +301,37 @@ model Ingredient {
   unit        String
   category    String?
   threshold   Float    @default(5)
+  alertChannels String @default("[\"in_app\"]")
+  lastUnitPrice Float  @default(0)
   stock       Stock[]
   batches     Batch[]
   recipeUses  RecipeIngredient[]
   wastage     WastageLog[]
   poLines     PurchaseOrderLine[]
+  priceHistory IngredientPriceHistory[]
+}
+
+model IngredientPriceHistory {
+  id           String   @id @default(cuid())
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  unitPrice    Float
+  supplierName String?
+  recordedAt   DateTime @default(now())
+}
+
+model StockTransfer {
+  id             String   @id @default(cuid())
+  fromLocationId String
+  fromName       String
+  toLocationId   String
+  toName         String
+  ingredientId   String
+  ingredientName String
+  quantity       Float
+  reason         String?
+  status         String   @default("requested")
+  createdAt      DateTime @default(now())
 }
 
 model Stock {
@@ -344,6 +452,9 @@ model TableSession {
   location   Location @relation(fields: [locationId], references: [id])
   guestCount Int      @default(1)
   serverName String?
+  guestName  String?
+  guestPhone String?
+  specialRequests String?
   status     String   @default("open")
   orderTotal Float    @default(0)
   startedAt  DateTime @default(now())
@@ -393,19 +504,58 @@ model Refund {
   createdAt DateTime @default(now())
 }
 
+model KdsStation {
+  id           String   @id @default(cuid())
+  restaurantId String
+  name         String
+  itemIds      String   @default("[]")
+  createdAt    DateTime @default(now())
+}
+
 model PaymentConfig {
   id              String  @id @default(cuid())
   restaurantId    String  @unique
   razorpayKey     String?
+  razorpaySecret  String?
+  webhookUrl      String?
+  testMode        Boolean @default(true)
   cashEnabled     Boolean @default(true)
   cardEnabled     Boolean @default(false)
   upiEnabled      Boolean @default(false)
+  walletEnabled   Boolean @default(false)
   splitEnabled    Boolean @default(false)
+  splitMax        Int     @default(0)
   tipsEnabled     Boolean @default(true)
   tipPooling      String  @default("per_server")
+  tipType         String  @default("percentage")
   swiggyRate      Float   @default(18)
   zomatoRate      Float   @default(20)
   ondcRate        Float   @default(10)
+}
+
+model Settlement {
+  id           String   @id @default(cuid())
+  restaurantId String
+  source       String
+  period       String
+  gross        Float    @default(0)
+  commission   Float    @default(0)
+  net          Float    @default(0)
+  status       String   @default("pending")
+  markedAt     DateTime?
+  createdAt    DateTime @default(now())
+  @@unique([restaurantId, source, period])
+}
+
+model CashReconciliation {
+  id          String   @id @default(cuid())
+  locationId  String
+  date        DateTime @default(now())
+  expected    Float
+  actual      Float
+  variance    Float
+  note        String?
+  createdAt   DateTime @default(now())
 }
 
 // ─── Staff & Labor ────────────────────────────────────────────────────────
@@ -444,19 +594,31 @@ model Customer {
   lastVisit   DateTime?
   tags        String   @default("[]")
   points      Int      @default(0)
+  favoriteDishes String @default("[]")
+  dietaryNotes String?
+  serviceNotes String?
+  birthday    DateTime?
+  anniversary DateTime?
+  optedOut    Boolean  @default(false)
   createdAt   DateTime @default(now())
   reservations Reservation[]
   campaigns   CampaignRecipient[]
 }
 
 model LoyaltyProgram {
-  id           String  @id @default(cuid())
-  restaurantId String  @unique
-  earnRate     Float   @default(1)
-  redeemRate   Float   @default(0.25)
-  minRedeem    Int     @default(100)
-  expiryMonths Int     @default(12)
-  enabled      Boolean @default(true)
+  id              String  @id @default(cuid())
+  restaurantId    String  @unique
+  earnRate        Float   @default(1)
+  redeemRate      Float   @default(0.25)
+  minRedeem       Int     @default(100)
+  expiryMonths    Int     @default(12)
+  maxDiscountPct  Int     @default(20)
+  goldThreshold   Float   @default(10000)
+  platinumThreshold Float @default(50000)
+  goldMultiplier  Float   @default(1.5)
+  platinumMultiplier Float @default(2)
+  awardOnAggregator Boolean @default(false)
+  enabled         Boolean @default(true)
 }
 
 model Campaign {
@@ -465,12 +627,50 @@ model Campaign {
   segment     String
   message     String
   channel     String   @default("whatsapp")
+  offerCode   String?
   status      String   @default("draft")
   sentCount   Int      @default(0)
+  readCount   Int      @default(0)
   redeemCount Int      @default(0)
   scheduledAt DateTime?
   createdAt   DateTime @default(now())
   recipients  CampaignRecipient[]
+}
+
+model AutoOffer {
+  id           String   @id @default(cuid())
+  restaurantId String
+  type         String   // birthday | anniversary
+  enabled      Boolean  @default(false)
+  daysBefore   Int      @default(3)
+  offerType    String   @default("percent") // percent | free_item | bonus_points
+  value        Float    @default(10)
+  validityDays Int      @default(7)
+  channel      String   @default("whatsapp")
+  skipLapsed   Boolean  @default(true)
+  @@unique([restaurantId, type])
+}
+
+model ReferralConfig {
+  id            String  @id @default(cuid())
+  restaurantId  String  @unique
+  enabled       Boolean @default(false)
+  referrerReward Float  @default(100)
+  refereeReward Float   @default(50)
+  maxPerMonth   Int     @default(5)
+  trigger       String  @default("referee_first_order")
+}
+
+model Waitlist {
+  id           String   @id @default(cuid())
+  locationId   String
+  guestName    String
+  phone        String?
+  partySize    Int
+  estWaitMin   Int      @default(15)
+  notifyChannel String  @default("sms")
+  status       String   @default("waiting") // waiting | notified | seated | no_show
+  createdAt    DateTime @default(now())
 }
 
 model CampaignRecipient {
@@ -498,6 +698,8 @@ model Reservation {
   status       String   @default("confirmed")
   noShowScore  Int      @default(20)
   specialRequests String?
+  preOrder     String?
+  reminderConfirmed Boolean @default(false)
   createdAt    DateTime @default(now())
 }
 
@@ -513,6 +715,15 @@ model Integration {
   syncStatus   String   @default("idle")
   createdAt    DateTime @default(now())
   @@unique([restaurantId, provider])
+}
+
+model SyncLog {
+  id            String   @id @default(cuid())
+  integrationId String
+  provider      String
+  status        String   @default("success")
+  message       String
+  createdAt     DateTime @default(now())
 }
 
 model AdminConfig {
@@ -564,6 +775,16 @@ model Alert {
   severity   String   @default("info")
   isRead     Boolean  @default(false)
   createdAt  DateTime @default(now())
+}
+
+model Review {
+  id           String   @id @default(cuid())
+  restaurantId String
+  author       String
+  rating       Int
+  text         String?
+  source       String   @default("google")
+  reviewedAt   DateTime @default(now())
 }
 
 model Notification {
