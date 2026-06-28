@@ -1,19 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 import { audit, getRestaurantId } from "@/lib/api-helpers";
 
 const DAY = 86400000;
 
-type Cust = Awaited<ReturnType<typeof prisma.customer.findMany>>[number];
+type Cust = {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  tier: string;
+  totalSpend: number;
+  visitCount: number;
+  lastVisit: string | null;
+  createdAt: string;
+  optedOut: boolean;
+  [key: string]: unknown;
+};
 
 function classify(customers: Cust[]) {
   const now = Date.now();
-  const spendSorted = [...customers].sort((a, b) => b.totalSpend - a.totalSpend);
+  const spendSorted = [...customers].sort((a, b) => Number(b.totalSpend) - Number(a.totalSpend));
   const vipCut = new Set(spendSorted.slice(0, Math.max(1, Math.ceil(customers.length * 0.1))).map((c) => c.id));
-  const inWindow = (c: Cust, lo: number, hi: number) => c.lastVisit && (now - new Date(c.lastVisit).getTime()) >= lo && (now - new Date(c.lastVisit).getTime()) < hi;
+  const inWindow = (c: Cust, lo: number, hi: number) =>
+    c.lastVisit && now - new Date(c.lastVisit).getTime() >= lo && now - new Date(c.lastVisit).getTime() < hi;
   const groups = {
-    vip: customers.filter((c) => vipCut.has(c.id) && c.totalSpend > 0),
-    new: customers.filter((c) => now - new Date(c.createdAt).getTime() < 30 * DAY && c.visitCount <= 1),
+    vip: customers.filter((c) => vipCut.has(c.id) && Number(c.totalSpend) > 0),
+    new: customers.filter((c) => now - new Date(c.createdAt).getTime() < 30 * DAY && Number(c.visitCount) <= 1),
     regular: customers.filter((c) => inWindow(c, 0, 30 * DAY)),
     atRisk: customers.filter((c) => inWindow(c, 30 * DAY, 60 * DAY)),
     lapsed: customers.filter((c) => !c.lastVisit || now - new Date(c.lastVisit).getTime() >= 60 * DAY),
@@ -23,26 +36,54 @@ function classify(customers: Cust[]) {
 
 export async function GET() {
   const restaurantId = await getRestaurantId();
-  const [customers, campaigns, reservations, loyalty, autoOffers, referral, waitlist] = await Promise.all([
-    prisma.customer.findMany({ orderBy: { totalSpend: "desc" } }),
-    prisma.campaign.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.reservation.findMany({ include: { customer: true, table: { select: { label: true } } }, orderBy: { dateTime: "asc" } }),
-    prisma.loyaltyProgram.findFirst(),
-    prisma.autoOffer.findMany({ where: { restaurantId } }),
-    prisma.referralConfig.findFirst({ where: { restaurantId } }),
-    prisma.waitlist.findMany({ where: { status: { in: ["waiting", "notified"] } }, orderBy: { createdAt: "asc" } }),
-  ]);
+  const sb = db();
+  const [customersResult, campaignsResult, reservationsResult, loyaltyResult, autoOffersResult, referralResult, waitlistResult] =
+    await Promise.all([
+      sb.from("Customer").select("*").order("totalSpend", { ascending: false }),
+      sb.from("Campaign").select("*").order("createdAt", { ascending: false }),
+      sb
+        .from("Reservation")
+        .select("*, customer:Customer(*), table:RestaurantTable(label)")
+        .order("dateTime", { ascending: true }),
+      sb.from("LoyaltyProgram").select("*").limit(1).maybeSingle(),
+      sb.from("AutoOffer").select("*").eq("restaurantId", restaurantId),
+      sb.from("ReferralConfig").select("*").eq("restaurantId", restaurantId).maybeSingle(),
+      sb.from("Waitlist").select("*").in("status", ["waiting", "notified"]).order("createdAt", { ascending: true }),
+    ]);
 
+  if (customersResult.error) sbError(customersResult.error, "customers/list");
+  if (campaignsResult.error) sbError(campaignsResult.error, "customers/campaigns");
+  if (reservationsResult.error) sbError(reservationsResult.error, "customers/reservations");
+  if (loyaltyResult.error) sbError(loyaltyResult.error, "customers/loyalty");
+  if (autoOffersResult.error) sbError(autoOffersResult.error, "customers/autoOffers");
+  if (referralResult.error) sbError(referralResult.error, "customers/referral");
+  if (waitlistResult.error) sbError(waitlistResult.error, "customers/waitlist");
+
+  const customers = (customersResult.data ?? []) as Cust[];
   const groups = classify(customers);
   const segments = {
-    counts: { vip: groups.vip.length, regular: groups.regular.length, atRisk: groups.atRisk.length, lapsed: groups.lapsed.length, new: groups.new.length },
+    counts: {
+      vip: groups.vip.length,
+      regular: groups.regular.length,
+      atRisk: groups.atRisk.length,
+      lapsed: groups.lapsed.length,
+      new: groups.new.length,
+    },
     members: groups,
   };
 
-  // Ensure auto-offer + referral rows exist (singletons).
-  const offerMap = Object.fromEntries(autoOffers.map((o) => [o.type, o]));
+  const offerMap = Object.fromEntries((autoOffersResult.data ?? []).map((o) => [o.type, o]));
 
-  return NextResponse.json({ customers, campaigns, reservations, loyalty, segments, autoOffers: offerMap, referral, waitlist });
+  return NextResponse.json({
+    customers,
+    campaigns: campaignsResult.data ?? [],
+    reservations: reservationsResult.data ?? [],
+    loyalty: loyaltyResult.data,
+    segments,
+    autoOffers: offerMap,
+    referral: referralResult.data,
+    waitlist: waitlistResult.data ?? [],
+  });
 }
 
 function segmentMembers(customers: Cust[], segment: string): Cust[] {
@@ -59,51 +100,96 @@ function segmentMembers(customers: Cust[], segment: string): Cust[] {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    const sb = db();
 
     if (body.type === "campaign") {
-      const customers = await prisma.customer.findMany();
-      const recipients = segmentMembers(customers, body.segment).filter((c) => !c.optedOut);
+      const { data: customers, error: custErr } = await sb.from("Customer").select("*");
+      if (custErr) sbError(custErr, "customers/campaign/customers");
+      const recipients = segmentMembers((customers ?? []) as Cust[], body.segment).filter((c) => !c.optedOut);
       const send = body.status === "sent";
-      const campaign = await prisma.campaign.create({
-        data: {
-          name: body.name, segment: body.segment, message: body.message, channel: body.channel ?? "whatsapp",
-          offerCode: body.offerCode || null, status: body.status ?? "draft",
-          scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
+      const campaignId = crypto.randomUUID();
+      const { data: campaign, error } = await sb
+        .from("Campaign")
+        .insert({
+          id: campaignId,
+          name: body.name,
+          segment: body.segment,
+          message: body.message,
+          channel: body.channel ?? "whatsapp",
+          offerCode: body.offerCode || null,
+          status: body.status ?? "draft",
+          scheduledAt: body.scheduledAt ? new Date(body.scheduledAt).toISOString() : null,
           sentCount: send ? recipients.length : 0,
           readCount: send ? Math.round(recipients.length * 0.6) : 0,
-          recipients: send ? { create: recipients.map((c) => ({ customerId: c.id, status: "sent" })) } : undefined,
-        },
-      });
+        })
+        .select()
+        .single();
+      if (error) sbError(error, "customers/campaign/create");
+      if (send && recipients.length) {
+        const { error: recErr } = await sb.from("CampaignRecipient").insert(
+          recipients.map((c) => ({ id: crypto.randomUUID(), campaignId, customerId: c.id, status: "sent" })),
+        );
+        if (recErr) sbError(recErr, "customers/campaign/recipients");
+      }
       await audit("create", "campaign", campaign.id, campaign);
       return NextResponse.json(campaign, { status: 201 });
     }
 
     if (body.type === "reservation") {
-      const reservation = await prisma.reservation.create({
-        data: {
-          locationId: body.locationId, tableId: body.tableId || null, customerId: body.customerId || null,
-          guestName: body.guestName, guestPhone: body.guestPhone ?? null, partySize: Number(body.partySize),
-          dateTime: new Date(body.dateTime), duration: Number(body.duration) || 90,
-          specialRequests: body.specialRequests ?? null, preOrder: body.preOrder ?? null,
+      const { data: reservation, error } = await sb
+        .from("Reservation")
+        .insert({
+          id: crypto.randomUUID(),
+          locationId: body.locationId,
+          tableId: body.tableId || null,
+          customerId: body.customerId || null,
+          guestName: body.guestName,
+          guestPhone: body.guestPhone ?? null,
+          partySize: Number(body.partySize),
+          dateTime: new Date(body.dateTime).toISOString(),
+          duration: Number(body.duration) || 90,
+          specialRequests: body.specialRequests ?? null,
+          preOrder: body.preOrder ?? null,
           noShowScore: body.noShowScore ?? 20,
-        },
-        include: { table: { select: { label: true } }, customer: true },
-      });
+        })
+        .select("*, table:RestaurantTable(label), customer:Customer(*)")
+        .single();
+      if (error) sbError(error, "customers/reservation/create");
       await audit("create", "reservation", reservation.id, reservation);
       return NextResponse.json(reservation, { status: 201 });
     }
 
     if (body.type === "waitlist") {
-      const entry = await prisma.waitlist.create({
-        data: { locationId: body.locationId, guestName: body.guestName, phone: body.phone ?? null, partySize: Number(body.partySize), estWaitMin: Number(body.estWaitMin) || 15, notifyChannel: body.notifyChannel ?? "sms" },
-      });
+      const { data: entry, error } = await sb
+        .from("Waitlist")
+        .insert({
+          id: crypto.randomUUID(),
+          locationId: body.locationId,
+          guestName: body.guestName,
+          phone: body.phone ?? null,
+          partySize: Number(body.partySize),
+          estWaitMin: Number(body.estWaitMin) || 15,
+          notifyChannel: body.notifyChannel ?? "sms",
+        })
+        .select()
+        .single();
+      if (error) sbError(error, "customers/waitlist/create");
       await audit("create", "waitlist", entry.id, entry);
       return NextResponse.json(entry, { status: 201 });
     }
 
-    const customer = await prisma.customer.create({
-      data: { name: body.name, phone: body.phone, email: body.email ?? null, tier: body.tier ?? "silver" },
-    });
+    const { data: customer, error } = await sb
+      .from("Customer")
+      .insert({
+        id: crypto.randomUUID(),
+        name: body.name,
+        phone: body.phone,
+        email: body.email ?? null,
+        tier: body.tier ?? "silver",
+      })
+      .select()
+      .single();
+    if (error) sbError(error, "customers/create");
     await audit("create", "customer", customer.id, customer);
     return NextResponse.json(customer, { status: 201 });
   } catch (e) {
@@ -116,80 +202,107 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const restaurantId = await getRestaurantId();
     const { type, id, ...data } = body;
+    const sb = db();
 
     if (type === "loyalty") {
-      const loyalty = await prisma.loyaltyProgram.update({ where: { id }, data });
+      const { data: loyalty, error } = await sb.from("LoyaltyProgram").update(data).eq("id", id).select().single();
+      if (error) sbError(error, "customers/loyalty/update");
       await audit("update", "loyalty_program", id, data);
       return NextResponse.json(loyalty);
     }
 
     if (type === "autoOffer") {
-      const offer = await prisma.autoOffer.upsert({
-        where: { restaurantId_type: { restaurantId, type: data.offerKind } },
-        update: { enabled: data.enabled, daysBefore: Number(data.daysBefore), offerType: data.offerType, value: Number(data.value), validityDays: Number(data.validityDays), channel: data.channel, skipLapsed: data.skipLapsed },
-        create: { restaurantId, type: data.offerKind, enabled: data.enabled, daysBefore: Number(data.daysBefore), offerType: data.offerType, value: Number(data.value), validityDays: Number(data.validityDays), channel: data.channel, skipLapsed: data.skipLapsed },
-      });
+      const { data: existing } = await sb
+        .from("AutoOffer")
+        .select("id")
+        .eq("restaurantId", restaurantId)
+        .eq("type", data.offerKind)
+        .maybeSingle();
+      const payload = {
+        id: existing?.id ?? crypto.randomUUID(),
+        restaurantId,
+        type: data.offerKind,
+        enabled: data.enabled,
+        daysBefore: Number(data.daysBefore),
+        offerType: data.offerType,
+        value: Number(data.value),
+        validityDays: Number(data.validityDays),
+        channel: data.channel,
+        skipLapsed: data.skipLapsed,
+      };
+      const { data: offer, error } = await sb.from("AutoOffer").upsert(payload, { onConflict: "restaurantId,type" }).select().single();
+      if (error) sbError(error, "customers/autoOffer");
       await audit("update", "auto_offer", offer.id, offer);
       return NextResponse.json(offer);
     }
 
     if (type === "referral") {
-      const referral = await prisma.referralConfig.upsert({
-        where: { restaurantId },
-        update: { enabled: data.enabled, referrerReward: Number(data.referrerReward), refereeReward: Number(data.refereeReward), maxPerMonth: Number(data.maxPerMonth), trigger: data.trigger },
-        create: { restaurantId, enabled: data.enabled, referrerReward: Number(data.referrerReward), refereeReward: Number(data.refereeReward), maxPerMonth: Number(data.maxPerMonth), trigger: data.trigger ?? "referee_first_order" },
-      });
+      const { data: existing } = await sb.from("ReferralConfig").select("id").eq("restaurantId", restaurantId).maybeSingle();
+      const payload = {
+        id: existing?.id ?? crypto.randomUUID(),
+        restaurantId,
+        enabled: data.enabled,
+        referrerReward: Number(data.referrerReward),
+        refereeReward: Number(data.refereeReward),
+        maxPerMonth: Number(data.maxPerMonth),
+        trigger: data.trigger ?? "referee_first_order",
+      };
+      const { data: referral, error } = await sb.from("ReferralConfig").upsert(payload, { onConflict: "restaurantId" }).select().single();
+      if (error) sbError(error, "customers/referral");
       await audit("update", "referral_config", referral.id, referral);
       return NextResponse.json(referral);
     }
 
     if (type === "waitlist") {
-      const entry = await prisma.waitlist.update({ where: { id }, data: { status: data.status } });
+      const { data: entry, error } = await sb.from("Waitlist").update({ status: data.status }).eq("id", id).select().single();
+      if (error) sbError(error, "customers/waitlist/update");
       await audit("update", "waitlist", id, data);
       return NextResponse.json(entry);
     }
 
     if (type === "reservation") {
-      const reservation = await prisma.reservation.update({
-        where: { id },
-        data: {
-          ...(data.guestName !== undefined && { guestName: data.guestName }),
-          ...(data.partySize !== undefined && { partySize: Number(data.partySize) }),
-          ...(data.dateTime && { dateTime: new Date(data.dateTime) }),
-          ...(data.tableId !== undefined && { tableId: data.tableId || null }),
-          ...(data.status !== undefined && { status: data.status }),
-          ...(data.specialRequests !== undefined && { specialRequests: data.specialRequests }),
-          ...(data.reminderConfirmed !== undefined && { reminderConfirmed: data.reminderConfirmed }),
-          ...(data.preOrder !== undefined && { preOrder: data.preOrder }),
-        },
-        include: { table: { select: { label: true } }, customer: true },
-      });
+      const updates: Record<string, unknown> = {};
+      if (data.guestName !== undefined) updates.guestName = data.guestName;
+      if (data.partySize !== undefined) updates.partySize = Number(data.partySize);
+      if (data.dateTime) updates.dateTime = new Date(data.dateTime).toISOString();
+      if (data.tableId !== undefined) updates.tableId = data.tableId || null;
+      if (data.status !== undefined) updates.status = data.status;
+      if (data.specialRequests !== undefined) updates.specialRequests = data.specialRequests;
+      if (data.reminderConfirmed !== undefined) updates.reminderConfirmed = data.reminderConfirmed;
+      if (data.preOrder !== undefined) updates.preOrder = data.preOrder;
+      const { data: reservation, error } = await sb
+        .from("Reservation")
+        .update(updates)
+        .eq("id", id)
+        .select("*, table:RestaurantTable(label), customer:Customer(*)")
+        .single();
+      if (error) sbError(error, "customers/reservation/update");
       await audit("update", "reservation", id, data);
       return NextResponse.json(reservation);
     }
 
     if (type === "campaign") {
-      const campaign = await prisma.campaign.update({ where: { id }, data });
+      const { data: campaign, error } = await sb.from("Campaign").update(data).eq("id", id).select().single();
+      if (error) sbError(error, "customers/campaign/update");
       return NextResponse.json(campaign);
     }
 
-    // Customer edit (incl. rich profile fields)
-    const customer = await prisma.customer.update({
-      where: { id },
-      data: {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.phone !== undefined && { phone: data.phone }),
-        ...(data.email !== undefined && { email: data.email }),
-        ...(data.tier !== undefined && { tier: data.tier }),
-        ...(data.dietaryNotes !== undefined && { dietaryNotes: data.dietaryNotes }),
-        ...(data.serviceNotes !== undefined && { serviceNotes: data.serviceNotes }),
-        ...(data.tags !== undefined && { tags: JSON.stringify(data.tags) }),
-        ...(data.favoriteDishes !== undefined && { favoriteDishes: JSON.stringify(data.favoriteDishes) }),
-        ...(data.optedOut !== undefined && { optedOut: data.optedOut }),
-        ...(data.birthday !== undefined && { birthday: data.birthday ? new Date(data.birthday) : null }),
-        ...(data.anniversary !== undefined && { anniversary: data.anniversary ? new Date(data.anniversary) : null }),
-      },
-    });
+    const customerUpdates: Record<string, unknown> = {};
+    if (data.name !== undefined) customerUpdates.name = data.name;
+    if (data.phone !== undefined) customerUpdates.phone = data.phone;
+    if (data.email !== undefined) customerUpdates.email = data.email;
+    if (data.tier !== undefined) customerUpdates.tier = data.tier;
+    if (data.dietaryNotes !== undefined) customerUpdates.dietaryNotes = data.dietaryNotes;
+    if (data.serviceNotes !== undefined) customerUpdates.serviceNotes = data.serviceNotes;
+    if (data.tags !== undefined) customerUpdates.tags = JSON.stringify(data.tags);
+    if (data.favoriteDishes !== undefined) customerUpdates.favoriteDishes = JSON.stringify(data.favoriteDishes);
+    if (data.optedOut !== undefined) customerUpdates.optedOut = data.optedOut;
+    if (data.birthday !== undefined) customerUpdates.birthday = data.birthday ? new Date(data.birthday).toISOString() : null;
+    if (data.anniversary !== undefined)
+      customerUpdates.anniversary = data.anniversary ? new Date(data.anniversary).toISOString() : null;
+
+    const { data: customer, error } = await sb.from("Customer").update(customerUpdates).eq("id", id).select().single();
+    if (error) sbError(error, "customers/update");
     await audit("update", "customer", id, data);
     return NextResponse.json(customer);
   } catch (e) {
@@ -203,10 +316,20 @@ export async function DELETE(req: NextRequest) {
     const type = req.nextUrl.searchParams.get("type");
     const reason = req.nextUrl.searchParams.get("reason") ?? "No reason provided";
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
-    if (type === "reservation") await prisma.reservation.update({ where: { id }, data: { status: "cancelled" } });
-    else if (type === "campaign") await prisma.campaign.delete({ where: { id } });
-    else if (type === "waitlist") await prisma.waitlist.delete({ where: { id } });
-    else await prisma.customer.delete({ where: { id } });
+    const sb = db();
+    if (type === "reservation") {
+      const { error } = await sb.from("Reservation").update({ status: "cancelled" }).eq("id", id);
+      if (error) sbError(error, "customers/deleteReservation");
+    } else if (type === "campaign") {
+      const { error } = await sb.from("Campaign").delete().eq("id", id);
+      if (error) sbError(error, "customers/deleteCampaign");
+    } else if (type === "waitlist") {
+      const { error } = await sb.from("Waitlist").delete().eq("id", id);
+      if (error) sbError(error, "customers/deleteWaitlist");
+    } else {
+      const { error } = await sb.from("Customer").delete().eq("id", id);
+      if (error) sbError(error, "customers/delete");
+    }
     await audit("delete", type ?? "customer", id, { reason });
     return NextResponse.json({ ok: true });
   } catch (e) {

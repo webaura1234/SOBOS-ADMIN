@@ -1,11 +1,5 @@
 import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import path from "path";
-
-const dbPath = path.join(process.cwd(), "db.sqlite");
-const adapter = new PrismaBetterSqlite3({ url: `file:${dbPath}` });
-const prisma = new PrismaClient({ adapter });
+import { prisma } from "../src/lib/prisma";
 
 async function main() {
   await prisma.notification.deleteMany();

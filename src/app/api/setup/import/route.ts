@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 import { audit, getRestaurantId, calcMargin } from "@/lib/api-helpers";
 
-// CSV data-migration import for onboarding (F-02). Each entity has a simple column contract.
 export async function POST(req: NextRequest) {
   try {
     const { entity, rows } = (await req.json()) as { entity: string; rows: Record<string, string>[] };
     const restaurantId = await getRestaurantId();
+    const sb = db();
     let created = 0;
     const errors: { row: number; error: string }[] = [];
 
@@ -14,41 +14,107 @@ export async function POST(req: NextRequest) {
       const r = rows[i];
       try {
         if (entity === "menu") {
-          // name, category, price
           if (!r.name) throw new Error("Missing name");
           let categoryId: string | null = null;
           if (r.category) {
-            const cat = await prisma.menuCategory.findFirst({ where: { restaurantId, name: r.category } }) ?? await prisma.menuCategory.create({ data: { restaurantId, name: r.category } });
-            categoryId = cat.id;
+            const { data: existingCat } = await sb
+              .from("MenuCategory")
+              .select("id")
+              .eq("restaurantId", restaurantId)
+              .eq("name", r.category)
+              .maybeSingle();
+            if (existingCat) {
+              categoryId = existingCat.id;
+            } else {
+              const newId = crypto.randomUUID();
+              const now = new Date().toISOString();
+              const { error } = await sb.from("MenuCategory").insert({
+                id: newId,
+                restaurantId,
+                name: r.category,
+                updatedAt: now,
+              });
+              if (error) throw new Error(error.message);
+              categoryId = newId;
+            }
           }
           const basePrice = Number(r.price) || 0;
-          await prisma.menuItem.create({ data: { restaurantId, name: r.name, categoryId, basePrice, grossMargin: calcMargin(basePrice, 0) } });
+          const now = new Date().toISOString();
+          const { error } = await sb.from("MenuItem").insert({
+            id: crypto.randomUUID(),
+            restaurantId,
+            name: r.name,
+            categoryId,
+            basePrice,
+            grossMargin: calcMargin(basePrice, 0),
+            updatedAt: now,
+          });
+          if (error) throw new Error(error.message);
         } else if (entity === "ingredient") {
-          // name, unit, threshold
           if (!r.name) throw new Error("Missing name");
-          const existing = await prisma.ingredient.findUnique({ where: { name: r.name } });
+          const { data: existing } = await sb.from("Ingredient").select("id").eq("name", r.name).maybeSingle();
           if (existing) throw new Error("Duplicate ingredient");
-          await prisma.ingredient.create({ data: { name: r.name, unit: r.unit || "unit", threshold: Number(r.threshold) || 5 } });
+          const { error } = await sb.from("Ingredient").insert({
+            id: crypto.randomUUID(),
+            name: r.name,
+            unit: r.unit || "unit",
+            threshold: Number(r.threshold) || 5,
+          });
+          if (error) throw new Error(error.message);
         } else if (entity === "customer") {
-          // name, phone, email
           if (!r.phone) throw new Error("Missing phone");
-          const existing = await prisma.customer.findUnique({ where: { phone: r.phone } });
+          const { data: existing } = await sb.from("Customer").select("id").eq("phone", r.phone).maybeSingle();
           if (existing) throw new Error("Duplicate phone");
-          await prisma.customer.create({ data: { name: r.name || r.phone, phone: r.phone, email: r.email || null } });
+          const { error } = await sb.from("Customer").insert({
+            id: crypto.randomUUID(),
+            name: r.name || r.phone,
+            phone: r.phone,
+            email: r.email || null,
+          });
+          if (error) throw new Error(error.message);
         } else if (entity === "supplier") {
-          // name, phone, email
           if (!r.name) throw new Error("Missing name");
-          await prisma.supplier.create({ data: { name: r.name, phone: r.phone || null, email: r.email || null } });
+          const { error } = await sb.from("Supplier").insert({
+            id: crypto.randomUUID(),
+            name: r.name,
+            phone: r.phone || null,
+            email: r.email || null,
+          });
+          if (error) throw new Error(error.message);
         } else if (entity === "staff") {
-          // phone, name, role, location
           if (!r.phone) throw new Error("Missing phone");
-          const existing = await prisma.user.findUnique({ where: { restaurantId_phone: { restaurantId, phone: r.phone } } });
+          const { data: existing } = await sb
+            .from("User")
+            .select("id")
+            .eq("restaurantId", restaurantId)
+            .eq("phone", r.phone)
+            .maybeSingle();
           if (existing) throw new Error("Duplicate phone");
-          const user = await prisma.user.create({ data: { restaurantId, name: r.name || r.phone, phone: r.phone, inviteStatus: "pending" } });
+          const userId = crypto.randomUUID();
+          const now = new Date().toISOString();
+          const { error } = await sb.from("User").insert({
+            id: userId,
+            restaurantId,
+            name: r.name || r.phone,
+            phone: r.phone,
+            inviteStatus: "pending",
+            updatedAt: now,
+          });
+          if (error) throw new Error(error.message);
           if (r.role) {
-            const role = await prisma.role.findFirst({ where: { restaurantId, name: r.role } });
-            const loc = r.location ? await prisma.location.findFirst({ where: { restaurantId, name: r.location } }) : null;
-            if (role) await prisma.userLocationRole.create({ data: { userId: user.id, roleId: role.id, locationId: loc?.id ?? null } });
+            const { data: role } = await sb.from("Role").select("id").eq("restaurantId", restaurantId).eq("name", r.role).maybeSingle();
+            const { data: loc } = r.location
+              ? await sb.from("Location").select("id").eq("restaurantId", restaurantId).eq("name", r.location).maybeSingle()
+              : { data: null };
+            if (role) {
+              const { error: assignErr } = await sb.from("UserLocationRole").insert({
+                id: crypto.randomUUID(),
+                userId,
+                roleId: role.id,
+                locationId: loc?.id ?? null,
+              });
+              if (assignErr) throw new Error(assignErr.message);
+            }
           }
         } else {
           throw new Error("Unknown entity");
@@ -66,13 +132,18 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Completion gating: flip setup locations live (pending_setup → active).
 export async function PATCH() {
   try {
     const restaurantId = await getRestaurantId();
-    const result = await prisma.location.updateMany({ where: { restaurantId, status: { in: ["setup", "pending_setup"] } }, data: { status: "active" } });
-    await audit("activate", "restaurant", restaurantId, { activated: result.count });
-    return NextResponse.json({ activated: result.count });
+    const { data, error } = await db()
+      .from("Location")
+      .update({ status: "active", updatedAt: new Date().toISOString() })
+      .eq("restaurantId", restaurantId)
+      .in("status", ["setup", "pending_setup"])
+      .select("id");
+    if (error) sbError(error, "setup/import/PATCH");
+    await audit("activate", "restaurant", restaurantId, { activated: data?.length ?? 0 });
+    return NextResponse.json({ activated: data?.length ?? 0 });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
   }

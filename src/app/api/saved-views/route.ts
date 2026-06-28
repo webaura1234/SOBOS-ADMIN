@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 import { audit, getRestaurantId } from "@/lib/api-helpers";
 
 function parseFilters(filters: string) {
@@ -15,13 +15,17 @@ export async function GET(req: NextRequest) {
   const module = req.nextUrl.searchParams.get("module");
   if (!module) return NextResponse.json({ error: "module is required" }, { status: 400 });
 
-  const views = await prisma.savedView.findMany({
-    where: { restaurantId, module },
-    orderBy: [{ isDefault: "desc" }, { name: "asc" }],
-  });
+  const { data: views, error } = await db()
+    .from("SavedView")
+    .select("*")
+    .eq("restaurantId", restaurantId)
+    .eq("module", module)
+    .order("isDefault", { ascending: false })
+    .order("name", { ascending: true });
+  if (error) sbError(error, "saved-views/GET");
 
   return NextResponse.json({
-    views: views.map((view) => ({ ...view, filters: parseFilters(view.filters) })),
+    views: (views ?? []).map((view) => ({ ...view, filters: parseFilters(view.filters as string) })),
   });
 }
 
@@ -33,27 +37,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "module and name are required" }, { status: 400 });
     }
 
+    const sb = db();
     if (body.isDefault) {
-      await prisma.savedView.updateMany({
-        where: { restaurantId, module: body.module },
-        data: { isDefault: false },
-      });
+      const { error } = await sb
+        .from("SavedView")
+        .update({ isDefault: false })
+        .eq("restaurantId", restaurantId)
+        .eq("module", body.module);
+      if (error) sbError(error, "saved-views/clearDefault");
     }
 
-    const view = await prisma.savedView.upsert({
-      where: { restaurantId_module_name: { restaurantId, module: body.module, name: body.name } },
-      update: { filters: JSON.stringify(body.filters ?? {}), isDefault: Boolean(body.isDefault) },
-      create: {
-        restaurantId,
-        module: body.module,
-        name: body.name,
-        filters: JSON.stringify(body.filters ?? {}),
-        isDefault: Boolean(body.isDefault),
-      },
-    });
+    const { data: existing } = await sb
+      .from("SavedView")
+      .select("id")
+      .eq("restaurantId", restaurantId)
+      .eq("module", body.module)
+      .eq("name", body.name)
+      .maybeSingle();
+
+    const { data: view, error } = await sb
+      .from("SavedView")
+      .upsert(
+        {
+          id: existing?.id ?? crypto.randomUUID(),
+          restaurantId,
+          module: body.module,
+          name: body.name,
+          filters: JSON.stringify(body.filters ?? {}),
+          isDefault: Boolean(body.isDefault),
+        },
+        { onConflict: "restaurantId,module,name" },
+      )
+      .select()
+      .single();
+    if (error) sbError(error, "saved-views/POST");
 
     await audit("upsert", "saved_view", view.id, { module: body.module, name: body.name, filters: body.filters });
-    return NextResponse.json({ ...view, filters: parseFilters(view.filters) }, { status: 201 });
+    return NextResponse.json({ ...view, filters: parseFilters(view.filters as string) }, { status: 201 });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
   }
@@ -63,19 +83,31 @@ export async function PATCH(req: NextRequest) {
   try {
     const restaurantId = await getRestaurantId();
     const { id, isDefault } = await req.json();
-    const existing = await prisma.savedView.findUnique({ where: { id } });
+    const sb = db();
+
+    const { data: existing, error: findErr } = await sb.from("SavedView").select("*").eq("id", id).maybeSingle();
+    if (findErr) sbError(findErr, "saved-views/find");
     if (!existing) return NextResponse.json({ error: "Saved view not found" }, { status: 404 });
 
     if (isDefault) {
-      await prisma.savedView.updateMany({
-        where: { restaurantId, module: existing.module },
-        data: { isDefault: false },
-      });
+      const { error } = await sb
+        .from("SavedView")
+        .update({ isDefault: false })
+        .eq("restaurantId", restaurantId)
+        .eq("module", existing.module);
+      if (error) sbError(error, "saved-views/clearDefault");
     }
 
-    const view = await prisma.savedView.update({ where: { id }, data: { isDefault: Boolean(isDefault) } });
+    const { data: view, error } = await sb
+      .from("SavedView")
+      .update({ isDefault: Boolean(isDefault) })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) sbError(error, "saved-views/PATCH");
+
     await audit("update", "saved_view", id, { isDefault });
-    return NextResponse.json({ ...view, filters: parseFilters(view.filters) });
+    return NextResponse.json({ ...view, filters: parseFilters(view.filters as string) });
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
   }
@@ -85,7 +117,8 @@ export async function DELETE(req: NextRequest) {
   try {
     const id = req.nextUrl.searchParams.get("id");
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
-    await prisma.savedView.delete({ where: { id } });
+    const { error } = await db().from("SavedView").delete().eq("id", id);
+    if (error) sbError(error, "saved-views/DELETE");
     await audit("delete", "saved_view", id);
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 import { audit, getRestaurantId } from "@/lib/api-helpers";
 
 export async function GET(req: NextRequest) {
@@ -10,84 +10,107 @@ export async function GET(req: NextRequest) {
   const tableFilter = req.nextUrl.searchParams.get("table");
   const search = req.nextUrl.searchParams.get("search") ?? "";
   const id = req.nextUrl.searchParams.get("id");
+  const sb = db();
 
-  // KDS station management data: stations + menu items to assign.
   if (req.nextUrl.searchParams.get("stations") === "1") {
     const restaurantId = await getRestaurantId();
-    const [stations, items] = await Promise.all([
-      prisma.kdsStation.findMany({ where: { restaurantId }, orderBy: { createdAt: "asc" } }),
-      prisma.menuItem.findMany({ where: { isDeleted: false }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    const [stationsResult, itemsResult] = await Promise.all([
+      sb.from("KdsStation").select("*").eq("restaurantId", restaurantId).order("createdAt", { ascending: true }),
+      sb.from("MenuItem").select("id, name").eq("isDeleted", false).order("name", { ascending: true }),
     ]);
-    return NextResponse.json({ stations, items });
+    if (stationsResult.error) sbError(stationsResult.error, "orders/stations");
+    if (itemsResult.error) sbError(itemsResult.error, "orders/items");
+    return NextResponse.json({ stations: stationsResult.data ?? [], items: itemsResult.data ?? [] });
   }
 
   if (id) {
-    const order = await prisma.order.findUnique({
-      where: { id },
-      include: { items: true, refunds: true },
-    });
+    const { data: order, error } = await sb
+      .from("Order")
+      .select("*, items:OrderItem(*), refunds:Refund(*)")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) sbError(error, "orders/getById");
     if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
     return NextResponse.json(order);
   }
 
-  const createdAt: { gte?: Date } = {};
+  let q = sb.from("Order").select("*, items:OrderItem(*)").order("createdAt", { ascending: false }).limit(100);
+  if (locationId) q = q.eq("locationId", locationId);
+  if (status) q = q.eq("status", status);
+  if (source) q = q.eq("source", source);
   if (period === "today") {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    createdAt.gte = start;
+    q = q.gte("createdAt", start.toISOString());
   } else if (period === "week") {
     const start = new Date();
     start.setDate(start.getDate() - 7);
-    createdAt.gte = start;
+    q = q.gte("createdAt", start.toISOString());
   }
+  if (tableFilter === "with_table") q = q.not("tableLabel", "is", null);
+  if (tableFilter === "no_table") q = q.is("tableLabel", null);
+  if (search) q = q.or(`number.ilike.%${search}%,tableLabel.ilike.%${search}%`);
 
-  const orders = await prisma.order.findMany({
-    where: {
-      ...(locationId && { locationId }),
-      ...(status && { status }),
-      ...(source && { source }),
-      ...(Object.keys(createdAt).length && { createdAt }),
-      ...(tableFilter === "with_table" && { tableLabel: { not: null } }),
-      ...(tableFilter === "no_table" && { tableLabel: null }),
-      ...(search && { OR: [{ number: { contains: search } }, { tableLabel: { contains: search } }] }),
-    },
-    include: { items: true, _count: { select: { items: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const { data: orders, error } = await q;
+  if (error) sbError(error, "orders/GET");
 
-  return NextResponse.json(orders);
+  const withCounts = (orders ?? []).map((o) => ({
+    ...o,
+    _count: { items: (o.items as unknown[] | null)?.length ?? 0 },
+  }));
+
+  return NextResponse.json(withCounts);
 }
 
 async function loadOrderControls(restaurantId: string) {
-  const cfg = await prisma.adminConfig.findUnique({ where: { restaurantId_scope_key: { restaurantId, scope: "orders", key: "orderControls" } } });
-  try { return cfg ? (JSON.parse(cfg.value) as Record<string, unknown>) : {}; } catch { return {}; }
+  const { data: cfg, error } = await db()
+    .from("AdminConfig")
+    .select("value")
+    .eq("restaurantId", restaurantId)
+    .eq("scope", "orders")
+    .eq("key", "orderControls")
+    .maybeSingle();
+  if (error) sbError(error, "orders/loadOrderControls");
+  try {
+    return cfg ? (JSON.parse(cfg.value as string) as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
     const restaurantId = await getRestaurantId();
+    const sb = db();
 
-    // ── KDS station management ──
     if (body.type === "station") {
       if (body.id) {
-        const station = await prisma.kdsStation.update({ where: { id: body.id }, data: { ...(body.name !== undefined && { name: body.name }), ...(body.itemIds !== undefined && { itemIds: JSON.stringify(body.itemIds) }) } });
+        const updates: Record<string, unknown> = {};
+        if (body.name !== undefined) updates.name = body.name;
+        if (body.itemIds !== undefined) updates.itemIds = JSON.stringify(body.itemIds);
+        const { data: station, error } = await sb.from("KdsStation").update(updates).eq("id", body.id).select().single();
+        if (error) sbError(error, "orders/updateStation");
         await audit("update", "kds_station", station.id, body);
         return NextResponse.json(station);
       }
-      const station = await prisma.kdsStation.create({ data: { restaurantId, name: body.name, itemIds: JSON.stringify(body.itemIds ?? []) } });
+      const { data: station, error } = await sb
+        .from("KdsStation")
+        .insert({ id: crypto.randomUUID(), restaurantId, name: body.name, itemIds: JSON.stringify(body.itemIds ?? []) })
+        .select()
+        .single();
+      if (error) sbError(error, "orders/createStation");
       await audit("create", "kds_station", station.id, station);
       return NextResponse.json(station, { status: 201 });
     }
 
     const { id, status, cancelReason } = body;
-    const existing = await prisma.order.findUnique({ where: { id } });
+    const { data: existing, error: findErr } = await sb.from("Order").select("*").eq("id", id).maybeSingle();
+    if (findErr) sbError(findErr, "orders/find");
     if (!existing) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
     if (status === "cancelled") {
       if (!String(cancelReason ?? "").trim()) return NextResponse.json({ error: "Cancellation reason is required" }, { status: 400 });
-      // Enforce the modification policy: cancelling a Preparing order is gated by config (manager-only action).
       if (existing.status === "preparing") {
         const controls = await loadOrderControls(restaurantId);
         if (controls.allowCancelPreparing === false) {
@@ -96,10 +119,19 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
-    const order = await prisma.order.update({ where: { id }, data: { status }, include: { items: true } });
+    const { data: order, error: updateErr } = await sb
+      .from("Order")
+      .update({ status, updatedAt: new Date().toISOString() })
+      .eq("id", id)
+      .select("*, items:OrderItem(*)")
+      .single();
+    if (updateErr) sbError(updateErr, "orders/update");
+
     if (status === "cancelled") {
-      await prisma.orderItem.updateMany({ where: { orderId: id }, data: { status: "cancelled" } });
+      const { error: itemErr } = await sb.from("OrderItem").update({ status: "cancelled" }).eq("orderId", id);
+      if (itemErr) sbError(itemErr, "orders/cancelItems");
     }
+
     await audit("update", "order", id, { from: existing.status, to: status, cancelReason });
     return NextResponse.json(order);
   } catch (e) {
@@ -111,7 +143,8 @@ export async function DELETE(req: NextRequest) {
   try {
     const stationId = req.nextUrl.searchParams.get("stationId");
     if (stationId) {
-      await prisma.kdsStation.delete({ where: { id: stationId } });
+      const { error } = await db().from("KdsStation").delete().eq("id", stationId);
+      if (error) sbError(error, "orders/deleteStation");
       await audit("delete", "kds_station", stationId);
       return NextResponse.json({ ok: true });
     }

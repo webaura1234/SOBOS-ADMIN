@@ -1,37 +1,68 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 import { getRestaurantId } from "@/lib/api-helpers";
 
-// Derives onboarding step completion from real admin data (F-02) so the
-// Setup checklist reflects what is actually configured, not just manual ticks.
 export async function GET() {
   try {
     const restaurantId = await getRestaurantId();
+    const sb = db();
 
-    const [restaurant, locations, tableCount, assignedStaff, menuCount, customerCount] = await Promise.all([
-      prisma.restaurant.findUnique({ where: { id: restaurantId } }),
-      prisma.location.findMany({
-        where: { restaurantId },
-        select: { id: true, status: true, address: true, city: true, pin: true, operatingHours: { select: { isClosed: true } } },
-      }),
-      prisma.restaurantTable.count({ where: { isDeleted: false, location: { restaurantId } } }),
-      prisma.userLocationRole.count({ where: { user: { restaurantId } } }),
-      prisma.menuItem.count({ where: { restaurantId } }),
-      prisma.customer.count(),
+    const [restaurantResult, locationsResult, menuCountResult, customerCountResult] = await Promise.all([
+      sb.from("Restaurant").select("*").eq("id", restaurantId).maybeSingle(),
+      sb
+        .from("Location")
+        .select("id, status, address, city, pin, operatingHours:OperatingHours(isClosed)")
+        .eq("restaurantId", restaurantId),
+      sb.from("MenuItem").select("*", { count: "exact", head: true }).eq("restaurantId", restaurantId),
+      sb.from("Customer").select("*", { count: "exact", head: true }),
     ]);
 
+    if (restaurantResult.error) sbError(restaurantResult.error, "setup/status/restaurant");
+    if (locationsResult.error) sbError(locationsResult.error, "setup/status/locations");
+    if (menuCountResult.error) sbError(menuCountResult.error, "setup/status/menu");
+    if (customerCountResult.error) sbError(customerCountResult.error, "setup/status/customers");
+
+    const restaurant = restaurantResult.data;
+    const locations = (locationsResult.data ?? []) as {
+      id: string;
+      status: string;
+      address: string;
+      city: string;
+      pin: string;
+      operatingHours: { isClosed: boolean }[];
+    }[];
+
+    const locationIds = locations.map((l) => l.id);
+    let tableCount = 0;
+    let assignedStaff = 0;
+    if (locationIds.length > 0) {
+      const { count, error } = await sb
+        .from("RestaurantTable")
+        .select("*", { count: "exact", head: true })
+        .eq("isDeleted", false)
+        .in("locationId", locationIds);
+      if (error) sbError(error, "setup/status/tables");
+      tableCount = count ?? 0;
+    }
+
+    const { data: restaurantUsers } = await sb.from("User").select("id").eq("restaurantId", restaurantId);
+    const userIds = (restaurantUsers ?? []).map((u) => u.id);
+    if (userIds.length > 0) {
+      const { count, error } = await sb
+        .from("UserLocationRole")
+        .select("*", { count: "exact", head: true })
+        .in("userId", userIds);
+      if (error) sbError(error, "setup/status/staff");
+      assignedStaff = count ?? 0;
+    }
+
     const auto = {
-      // Profile is "done" once identity + statutory ids + a contact are filled.
       profile: !!(restaurant?.name && restaurant.fssai && restaurant.gstin && (restaurant.email || restaurant.phone)),
-      // A usable location needs a full postal address.
       location: locations.some((l) => l.address && l.city && l.pin),
-      // Hours are configured once a location is open at least one day.
       hours: locations.some((l) => l.operatingHours.some((h) => !h.isClosed)),
       tables: tableCount > 0,
-      // Optional: at least one staff member assigned a role/location.
       staff: assignedStaff > 0,
-      // Optional: any menu or customer data has been imported/created.
-      migration: menuCount > 0 || customerCount > 0,
+      migration: (menuCountResult.count ?? 0) > 0 || (customerCountResult.count ?? 0) > 0,
     };
 
     return NextResponse.json({

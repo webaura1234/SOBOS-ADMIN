@@ -1,23 +1,26 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 async function getOpsSummary(locationId: string | null) {
-  const [activeOrders, stockRows] = await Promise.all([
-    prisma.order.count({
-      where: {
-        ...(locationId && { locationId }),
-        status: { in: ["pending", "confirmed", "preparing", "ready"] },
-      },
-    }),
-    prisma.stock.findMany({
-      where: locationId ? { locationId } : {},
-      include: { ingredient: { select: { threshold: true } } },
-    }),
-  ]);
+  const sb = db();
+  let orderQ = sb
+    .from("Order")
+    .select("*", { count: "exact", head: true })
+    .in("status", ["pending", "confirmed", "preparing", "ready"]);
+  if (locationId) orderQ = orderQ.eq("locationId", locationId);
+
+  let stockQ = sb.from("Stock").select("quantity, ingredient:Ingredient(threshold)");
+  if (locationId) stockQ = stockQ.eq("locationId", locationId);
+
+  const [orderResult, stockResult] = await Promise.all([orderQ, stockQ]);
+  if (orderResult.error) sbError(orderResult.error, "realtime/activeOrders");
+  if (stockResult.error) sbError(stockResult.error, "realtime/stock");
+
+  const stockRows = (stockResult.data ?? []) as unknown as { quantity: number; ingredient: { threshold: number } }[];
   const lowStockCount = stockRows.filter((row) => row.quantity <= row.ingredient.threshold).length;
-  return { activeOrders, lowStockCount, at: new Date().toISOString() };
+  return { activeOrders: orderResult.count ?? 0, lowStockCount, at: new Date().toISOString() };
 }
 
 export async function GET(req: NextRequest) {

@@ -129,10 +129,23 @@ function MenuPageContent() {
       taxCategory: item.taxCategory, availability: item.availability,
       dietaryFlags: parseJson(item.dietaryFlags), allergenTags: parseJson(item.allergenTags), photos: parseJson(item.photos),
     });
-    setRecipeLines(item.recipe?.ingredients.map((l) => ({ id: l.id, ingredientId: l.ingredientId, quantity: l.quantity, unit: l.unit || l.ingredient?.unit || "", ingredient: l.ingredient })) ?? []);
-    setVariants(item.variants.map((v) => ({ ...v })));
-    setModifierGroups(item.modifierGroups.map((g) => ({ ...g, options: g.options.map((o) => ({ ...o })) })));
-    setSubstitutions(item.substitutions.map((s) => ({ ...s })));
+    setRecipeLines(
+      (Array.isArray(item.recipe?.ingredients) ? item.recipe.ingredients : []).map((l) => ({
+        id: l.id,
+        ingredientId: l.ingredientId,
+        quantity: l.quantity,
+        unit: l.unit || l.ingredient?.unit || "",
+        ingredient: l.ingredient,
+      })),
+    );
+    setVariants((item.variants ?? []).map((v) => ({ ...v })));
+    setModifierGroups(
+      (item.modifierGroups ?? []).map((g) => ({
+        ...g,
+        options: (g.options ?? []).map((o) => ({ ...o })),
+      })),
+    );
+    setSubstitutions((item.substitutions ?? []).map((s) => ({ ...s })));
     setDrawerTab("details");
   }, []);
 

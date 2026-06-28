@@ -1,9 +1,10 @@
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 
 export async function getRestaurantId() {
-  const r = await prisma.restaurant.findFirst({ select: { id: true } });
-  if (!r) throw new Error("No restaurant found");
-  return r.id;
+  const { data, error } = await db().from("Restaurant").select("id").limit(1).maybeSingle();
+  if (error) sbError(error, "getRestaurantId");
+  if (!data) throw new Error("No restaurant found");
+  return data.id as string;
 }
 
 export async function audit(
@@ -11,18 +12,18 @@ export async function audit(
   resourceType: string,
   resourceId: string | null,
   after?: unknown,
-  before?: unknown
+  before?: unknown,
 ) {
-  await prisma.auditLog.create({
-    data: {
-      actorName: "Rajesh Kumar",
-      action,
-      resourceType,
-      resourceId,
-      beforeJson: before ? JSON.stringify(before) : null,
-      afterJson: after ? JSON.stringify(after) : null,
-    },
+  const { error } = await db().from("AuditLog").insert({
+    id: crypto.randomUUID(),
+    actorName: "Rajesh Kumar",
+    action,
+    resourceType,
+    resourceId,
+    beforeJson: before ? JSON.stringify(before) : null,
+    afterJson: after ? JSON.stringify(after) : null,
   });
+  if (error) sbError(error, "audit");
 }
 
 export function calcMargin(price: number, cost: number) {
@@ -30,41 +31,94 @@ export function calcMargin(price: number, cost: number) {
   return Math.round(((price - cost) / price) * 1000) / 10;
 }
 
-/**
- * When an ingredient's stock at any location drops to/below zero, auto-flag the
- * menu items whose recipe uses it as Out of Stock (F-13). When it is replenished,
- * restore items that were auto-flagged (admins can still override manually).
- */
 export async function syncAutoOutOfStock(ingredientId: string) {
-  const totalStock = await prisma.stock.aggregate({ _sum: { quantity: true }, where: { ingredientId } });
-  const depleted = (totalStock._sum.quantity ?? 0) <= 0;
-  const recipeLinks = await prisma.recipeIngredient.findMany({ where: { ingredientId }, select: { recipe: { select: { itemId: true } } } });
-  const itemIds = [...new Set(recipeLinks.map((r) => r.recipe.itemId))];
+  const sb = db();
+  const { data: stockRows, error: stockErr } = await sb
+    .from("Stock")
+    .select("quantity")
+    .eq("ingredientId", ingredientId);
+  if (stockErr) sbError(stockErr, "syncAutoOutOfStock/stock");
+
+  const total = (stockRows ?? []).reduce((sum, row) => sum + Number(row.quantity), 0);
+  const depleted = total <= 0;
+
+  const { data: recipeLinks, error: linkErr } = await sb
+    .from("RecipeIngredient")
+    .select("recipeId, Recipe(itemId)")
+    .eq("ingredientId", ingredientId);
+  if (linkErr) sbError(linkErr, "syncAutoOutOfStock/recipes");
+
+  const itemIds = [
+    ...new Set(
+      (recipeLinks ?? [])
+        .map((row) => {
+          const recipe = row.Recipe as unknown as { itemId: string } | null;
+          return recipe?.itemId;
+        })
+        .filter(Boolean) as string[],
+    ),
+  ];
   if (itemIds.length === 0) return;
+
   if (depleted) {
-    await prisma.menuItem.updateMany({
-      where: { id: { in: itemIds }, availability: "available" },
-      data: { availability: "out_of_stock", autoOutOfStock: true },
-    });
+    const { error } = await sb
+      .from("MenuItem")
+      .update({ availability: "out_of_stock", autoOutOfStock: true })
+      .in("id", itemIds)
+      .eq("availability", "available");
+    if (error) sbError(error, "syncAutoOutOfStock/deplete");
   } else {
-    await prisma.menuItem.updateMany({
-      where: { id: { in: itemIds }, autoOutOfStock: true },
-      data: { availability: "available", autoOutOfStock: false },
-    });
+    const { error } = await sb
+      .from("MenuItem")
+      .update({ availability: "available", autoOutOfStock: false })
+      .in("id", itemIds)
+      .eq("autoOutOfStock", true);
+    if (error) sbError(error, "syncAutoOutOfStock/restock");
   }
 }
 
-/**
- * Recompute recipe cost + gross margin for every item using an ingredient, after
- * its unit price changes (e.g. PO received). recipeCost = Σ(qty × latest unit price).
- */
 export async function recomputeRecipeCostsForIngredient(ingredientId: string) {
-  const recipes = await prisma.recipeIngredient.findMany({ where: { ingredientId }, select: { recipe: { select: { itemId: true } } } });
-  const itemIds = [...new Set(recipes.map((r) => r.recipe.itemId))];
+  const sb = db();
+  const { data: recipeLinks, error: linkErr } = await sb
+    .from("RecipeIngredient")
+    .select("recipeId, Recipe(itemId)")
+    .eq("ingredientId", ingredientId);
+  if (linkErr) sbError(linkErr, "recomputeRecipeCosts/links");
+
+  const itemIds = [
+    ...new Set(
+      (recipeLinks ?? [])
+        .map((row) => {
+          const recipe = row.Recipe as unknown as { itemId: string } | null;
+          return recipe?.itemId;
+        })
+        .filter(Boolean) as string[],
+    ),
+  ];
+
   for (const itemId of itemIds) {
-    const item = await prisma.menuItem.findUnique({ where: { id: itemId }, include: { recipe: { include: { ingredients: { include: { ingredient: true } } } } } });
-    if (!item?.recipe) continue;
-    const cost = item.recipe.ingredients.reduce((sum, line) => sum + line.quantity * (line.ingredient.lastUnitPrice || 0), 0);
-    await prisma.menuItem.update({ where: { id: itemId }, data: { recipeCost: cost, grossMargin: calcMargin(item.basePrice, cost) } });
+    const { data: item, error: itemErr } = await sb
+      .from("MenuItem")
+      .select("id, basePrice, Recipe(id, RecipeIngredient(quantity, Ingredient(lastUnitPrice)))")
+      .eq("id", itemId)
+      .maybeSingle();
+    if (itemErr) sbError(itemErr, "recomputeRecipeCosts/item");
+    if (!item) continue;
+    const recipeData = item.Recipe as unknown as
+      | {
+          RecipeIngredient: { quantity: number; Ingredient: { lastUnitPrice: number } | null }[];
+        }
+      | null;
+    if (!recipeData) continue;
+
+    const cost = (recipeData.RecipeIngredient ?? []).reduce(
+      (sum, line) => sum + line.quantity * (line.Ingredient?.lastUnitPrice ?? 0),
+      0,
+    );
+    const { error } = await sb
+      .from("MenuItem")
+      .update({ recipeCost: cost, grossMargin: calcMargin(item.basePrice as number, cost) })
+      .eq("id", itemId);
+    if (error) sbError(error, "recomputeRecipeCosts/update");
   }
 }

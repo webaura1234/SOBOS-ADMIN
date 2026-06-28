@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
   const locationId = req.nextUrl.searchParams.get("locationId");
+  const sb = db();
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const where = locationId ? { locationId } : {};
-  const stockWhere = locationId ? { locationId } : {};
-  const tableWhere = locationId ? { locationId, isDeleted: false } : { isDeleted: false };
+  const todayIso = todayStart.toISOString();
 
   const now = new Date();
   const currentHour = now.getHours();
@@ -22,63 +21,98 @@ export async function GET(req: NextRequest) {
 
   const [
     ordersToday,
-    revenueToday,
+    revenueRows,
     orders,
-    alerts,
+    alertsResult,
     lastWeekSameHourCount,
     pendingOrders,
     occupiedTables,
-    stockRows,
-    recentOrders,
+    stockResult,
+    recentOrdersResult,
   ] = await Promise.all([
-    prisma.order.count({ where: { ...where, createdAt: { gte: todayStart } } }),
-    prisma.order.aggregate({
-      where: { ...where, createdAt: { gte: todayStart }, status: { not: "cancelled" } },
-      _sum: { total: true },
-    }),
-    prisma.order.findMany({
-      where: { ...where, createdAt: { gte: todayStart } },
-      select: { total: true, createdAt: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.alert.findMany({
-      where: locationId ? { locationId } : {},
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    }),
-    prisma.order.count({
-      where: {
-        ...where,
-        createdAt: { gte: lastWeekHourStart, lt: lastWeekHourEnd },
-      },
-    }),
-    prisma.order.count({
-      where: { ...where, status: { in: ["pending", "confirmed", "preparing", "ready"] } },
-    }),
-    prisma.restaurantTable.count({ where: { ...tableWhere, status: "occupied" } }),
-    prisma.stock.findMany({
-      where: stockWhere,
-      include: { ingredient: { select: { name: true, unit: true, threshold: true } } },
-    }),
-    prisma.order.findMany({
-      where,
-      select: {
-        id: true,
-        number: true,
-        status: true,
-        total: true,
-        tableLabel: true,
-        source: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 6,
-    }),
+    (async () => {
+      let q = sb.from("Order").select("*", { count: "exact", head: true }).gte("createdAt", todayIso);
+      if (locationId) q = q.eq("locationId", locationId);
+      const { count, error } = await q;
+      if (error) sbError(error, "dashboard/ordersToday");
+      return count ?? 0;
+    })(),
+    (async () => {
+      let q = sb
+        .from("Order")
+        .select("total")
+        .gte("createdAt", todayIso)
+        .not("status", "eq", "cancelled");
+      if (locationId) q = q.eq("locationId", locationId);
+      const { data, error } = await q;
+      if (error) sbError(error, "dashboard/revenue");
+      return data ?? [];
+    })(),
+    (async () => {
+      let q = sb.from("Order").select("total, createdAt").gte("createdAt", todayIso).order("createdAt", { ascending: true });
+      if (locationId) q = q.eq("locationId", locationId);
+      const { data, error } = await q;
+      if (error) sbError(error, "dashboard/orders");
+      return data ?? [];
+    })(),
+    (async () => {
+      let q = sb.from("Alert").select("*").order("createdAt", { ascending: false }).limit(10);
+      if (locationId) q = q.eq("locationId", locationId);
+      const { data, error } = await q;
+      if (error) sbError(error, "dashboard/alerts");
+      return data ?? [];
+    })(),
+    (async () => {
+      let q = sb
+        .from("Order")
+        .select("*", { count: "exact", head: true })
+        .gte("createdAt", lastWeekHourStart.toISOString())
+        .lt("createdAt", lastWeekHourEnd.toISOString());
+      if (locationId) q = q.eq("locationId", locationId);
+      const { count, error } = await q;
+      if (error) sbError(error, "dashboard/lastWeekHour");
+      return count ?? 0;
+    })(),
+    (async () => {
+      let q = sb
+        .from("Order")
+        .select("*", { count: "exact", head: true })
+        .in("status", ["pending", "confirmed", "preparing", "ready"]);
+      if (locationId) q = q.eq("locationId", locationId);
+      const { count, error } = await q;
+      if (error) sbError(error, "dashboard/pendingOrders");
+      return count ?? 0;
+    })(),
+    (async () => {
+      let q = sb.from("RestaurantTable").select("*", { count: "exact", head: true }).eq("isDeleted", false).eq("status", "occupied");
+      if (locationId) q = q.eq("locationId", locationId);
+      const { count, error } = await q;
+      if (error) sbError(error, "dashboard/occupiedTables");
+      return count ?? 0;
+    })(),
+    (async () => {
+      let q = sb.from("Stock").select("*, ingredient:Ingredient(name, unit, threshold)");
+      if (locationId) q = q.eq("locationId", locationId);
+      const { data, error } = await q;
+      if (error) sbError(error, "dashboard/stock");
+      return data ?? [];
+    })(),
+    (async () => {
+      let q = sb
+        .from("Order")
+        .select("id, number, status, total, tableLabel, source, createdAt")
+        .order("createdAt", { ascending: false })
+        .limit(6);
+      if (locationId) q = q.eq("locationId", locationId);
+      const { data, error } = await q;
+      if (error) sbError(error, "dashboard/recentOrders");
+      return data ?? [];
+    })(),
   ]);
 
-  const revenue = revenueToday._sum.total ?? 0;
+  const revenue = revenueRows.reduce((sum: number, o: { total: number }) => sum + Number(o.total), 0);
   const avgTicket = ordersToday > 0 ? revenue / ordersToday : 0;
-  const thisHourOrders = orders.filter((o) => new Date(o.createdAt).getHours() === currentHour).length;
+  const thisHourOrders = orders.filter((o: { createdAt: string }) => new Date(o.createdAt).getHours() === currentHour).length;
   const hourDelta =
     lastWeekSameHourCount > 0
       ? Math.round(((thisHourOrders - lastWeekSameHourCount) / lastWeekSameHourCount) * 100)
@@ -88,10 +122,17 @@ export async function GET(req: NextRequest) {
 
   const hourlyBuckets = Array.from({ length: 24 }, (_, h) => ({
     hour: h,
-    count: orders.filter((o) => new Date(o.createdAt).getHours() === h).length,
-    revenue: orders.filter((o) => new Date(o.createdAt).getHours() === h).reduce((s, o) => s + o.total, 0),
+    count: orders.filter((o: { createdAt: string }) => new Date(o.createdAt).getHours() === h).length,
+    revenue: orders
+      .filter((o: { createdAt: string }) => new Date(o.createdAt).getHours() === h)
+      .reduce((s: number, o: { total: number }) => s + Number(o.total), 0),
   }));
 
+  const stockRows = stockResult as {
+    id: string;
+    quantity: number;
+    ingredient: { name: string; unit: string; threshold: number };
+  }[];
   const lowStock = stockRows
     .filter((s) => s.quantity <= s.ingredient.threshold)
     .map((s) => ({
@@ -114,9 +155,9 @@ export async function GET(req: NextRequest) {
       lowStockCount: lowStock.length,
     },
     hourlyBuckets,
-    alerts,
+    alerts: alertsResult,
     lowStock,
-    recentOrders,
+    recentOrders: recentOrdersResult,
     sparklines: {
       orders: hourlyBuckets.slice(11, 19).map((b) => b.count),
       revenue: hourlyBuckets.slice(11, 19).map((b) => b.revenue),
@@ -127,8 +168,9 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const { id, isRead } = await req.json();
-    const alert = await prisma.alert.update({ where: { id }, data: { isRead } });
-    return NextResponse.json(alert);
+    const { data, error } = await db().from("Alert").update({ isRead }).eq("id", id).select().single();
+    if (error) sbError(error, "dashboard/PATCH");
+    return NextResponse.json(data);
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 400 });
   }

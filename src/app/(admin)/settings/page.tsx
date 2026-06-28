@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader, TabBar, BtnPrimary, BtnSecondary } from "@/components/ui/shared";
 import { ConfirmDialog, FormField, inputClass, selectClass } from "@/components/ui/forms";
@@ -21,7 +21,7 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Dependency map: a feature can only be enabled when its prerequisite is on.
 const FEATURE_DEPS: Record<string, string> = { qr_ordering: "dine_in", reservations: "dine_in" };
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
   const [data, setData] = useState<SettingsData | null>(null);
@@ -282,5 +282,13 @@ export default function SettingsPage() {
 
       <ConfirmDialog open={!!confirmRole} title="Delete role?" message="Roles with assigned staff or the last full-admin role can't be deleted." confirmLabel="Delete" destructive onConfirm={deleteRole} onCancel={() => setConfirmRole(null)} />
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading settings…</div>}>
+      <SettingsPageContent />
+    </Suspense>
   );
 }

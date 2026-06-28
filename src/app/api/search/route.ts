@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db, sbError } from "@/lib/db";
 
 export interface SearchResult {
   id: string;
@@ -18,64 +18,68 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ results: [] as SearchResult[] });
   }
 
-  const orderWhere = locationId ? { locationId } : {};
-  const stockWhere = locationId ? { locationId } : {};
+  const sb = db();
+  const pattern = `%${q}%`;
 
-  const [orders, menuItems, customers, staff, stock] = await Promise.all([
-    prisma.order.findMany({
-      where: {
-        ...orderWhere,
-        OR: [
-          { number: { contains: q } },
-          { tableLabel: { contains: q } },
-        ],
-      },
-      select: { id: true, number: true, status: true, tableLabel: true, total: true },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    }),
-    prisma.menuItem.findMany({
-      where: {
-        isDeleted: false,
-        OR: [
-          { name: { contains: q } },
-          { description: { contains: q } },
-        ],
-      },
-      select: { id: true, name: true, availability: true, category: { select: { name: true } } },
-      orderBy: { name: "asc" },
-      take: limit,
-    }),
-    prisma.customer.findMany({
-      where: {
-        OR: [
-          { name: { contains: q } },
-          { phone: { contains: q } },
-          { email: { contains: q } },
-        ],
-      },
-      select: { id: true, name: true, phone: true, tier: true },
-      orderBy: { name: "asc" },
-      take: limit,
-    }),
-    prisma.user.findMany({
-      where: {
-        OR: [
-          { name: { contains: q } },
-          { phone: { contains: q } },
-          { email: { contains: q } },
-        ],
-      },
-      select: { id: true, name: true, phone: true, status: true },
-      orderBy: { name: "asc" },
-      take: limit,
-    }),
-    prisma.stock.findMany({
-      where: stockWhere,
-      include: { ingredient: { select: { name: true, unit: true, threshold: true } } },
-      take: 50,
-    }),
+  const [ordersResult, menuResult, customersResult, staffResult, stockResult] = await Promise.all([
+    (async () => {
+      let query = sb
+        .from("Order")
+        .select("id, number, status, tableLabel, total")
+        .or(`number.ilike.${pattern},tableLabel.ilike.${pattern}`)
+        .order("createdAt", { ascending: false })
+        .limit(limit);
+      if (locationId) query = query.eq("locationId", locationId);
+      const { data, error } = await query;
+      if (error) sbError(error, "search/orders");
+      return data ?? [];
+    })(),
+    sb
+      .from("MenuItem")
+      .select("id, name, availability, category:MenuCategory(name)")
+      .eq("isDeleted", false)
+      .or(`name.ilike.${pattern},description.ilike.${pattern}`)
+      .order("name", { ascending: true })
+      .limit(limit),
+    sb
+      .from("Customer")
+      .select("id, name, phone, tier")
+      .or(`name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`)
+      .order("name", { ascending: true })
+      .limit(limit),
+    sb
+      .from("User")
+      .select("id, name, phone, status")
+      .or(`name.ilike.${pattern},phone.ilike.${pattern},email.ilike.${pattern}`)
+      .order("name", { ascending: true })
+      .limit(limit),
+    (async () => {
+      let query = sb.from("Stock").select("*, ingredient:Ingredient(name, unit, threshold)").limit(50);
+      if (locationId) query = query.eq("locationId", locationId);
+      const { data, error } = await query;
+      if (error) sbError(error, "search/stock");
+      return data ?? [];
+    })(),
   ]);
+
+  if (menuResult.error) sbError(menuResult.error, "search/menu");
+  if (customersResult.error) sbError(customersResult.error, "search/customers");
+  if (staffResult.error) sbError(staffResult.error, "search/staff");
+
+  const orders = ordersResult;
+  const menuItems = (menuResult.data ?? []) as unknown as {
+    id: string;
+    name: string;
+    availability: string;
+    category: { name: string } | null;
+  }[];
+  const customers = customersResult.data ?? [];
+  const staff = staffResult.data ?? [];
+  const stock = stockResult as {
+    id: string;
+    quantity: number;
+    ingredient: { name: string; unit: string; threshold: number };
+  }[];
 
   const inventoryMatches = stock
     .filter((s) => s.ingredient.name.toLowerCase().includes(q.toLowerCase()))
@@ -86,7 +90,7 @@ export async function GET(req: NextRequest) {
       id: o.id,
       type: "order" as const,
       label: o.number,
-      sublabel: [o.tableLabel, o.status, `₹${Math.round(o.total)}`].filter(Boolean).join(" · "),
+      sublabel: [o.tableLabel, o.status, `₹${Math.round(Number(o.total))}`].filter(Boolean).join(" · "),
       href: `/orders?open=${o.id}`,
     })),
     ...menuItems.map((m) => ({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { updateSession } from "@/utils/supabase/middleware";
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/_next", "/favicon.ico"];
 
@@ -43,9 +44,10 @@ function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
+  const supabaseResponse = await updateSession(req);
   const { pathname } = req.nextUrl;
-  if (isPublic(pathname)) return NextResponse.next();
+  if (isPublic(pathname)) return supabaseResponse;
 
   const role = req.cookies.get("sobosRole")?.value;
   if (!role) {
@@ -58,7 +60,7 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (role === "owner") return NextResponse.next();
+  if (role === "owner") return supabaseResponse;
 
   const permission = pathname.startsWith("/api/")
     ? permissionFor(pathname, API_PERMISSIONS)
@@ -74,7 +76,7 @@ export function proxy(req: NextRequest) {
     return NextResponse.redirect(dashboardUrl);
   }
 
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {
