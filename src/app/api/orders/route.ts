@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   const { data: orders, error } = await q;
   if (error) sbError(error, "orders/GET");
 
-  const withCounts = (orders ?? []).map((o) => ({
+  const withCounts = (orders ?? []).map((o: any) => ({
     ...o,
     _count: { items: (o.items as unknown[] | null)?.length ?? 0 },
   }));

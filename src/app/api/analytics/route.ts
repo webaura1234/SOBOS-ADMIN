@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, sbError } from "@/lib/db";
 import { getRestaurantId } from "@/lib/api-helpers";
 
+interface HeatCell {
+  count: number;
+  revenue: number;
+}
+
 const DAY = 86400000;
 
 function rangeFromParams(req: NextRequest) {
@@ -37,7 +42,7 @@ export async function GET(req: NextRequest) {
     if (locationId) q = q.eq("locationId", locationId);
     const { data: wastage, error } = await q;
     if (error) sbError(error, "analytics/waste");
-    const byReason = (wastage ?? []).reduce<Record<string, number>>((acc, w) => {
+    const byReason = (wastage ?? []).reduce((acc: Record<string, number>, w: any) => {
       acc[w.reason as string] = (acc[w.reason as string] ?? 0) + Number(w.estCost);
       return acc;
     }, {});
@@ -75,15 +80,16 @@ export async function GET(req: NextRequest) {
     const { data: orders, error } = await q;
     if (error) sbError(error, "analytics/payments");
 
-    const breakdownMap = (orders ?? []).reduce<
-      Record<string, { source: string; _count: number; _sum: { total: number } }>
-    >((acc, o) => {
-      const row = acc[o.source as string] ?? { source: o.source as string, _count: 0, _sum: { total: 0 } };
-      row._count += 1;
-      row._sum.total += Number(o.total);
-      acc[o.source as string] = row;
-      return acc;
-    }, {});
+    const breakdownMap = (orders ?? []).reduce(
+      (acc: Record<string, { source: string; _count: number; _sum: { total: number } }>, o: any) => {
+        const row = acc[o.source as string] ?? { source: o.source as string, _count: 0, _sum: { total: 0 } };
+        row._count += 1;
+        row._sum.total += Number(o.total);
+        acc[o.source as string] = row;
+        return acc;
+      },
+      {},
+    );
     const breakdown = Object.values(breakdownMap);
 
     let comparison = null;
@@ -109,8 +115,8 @@ export async function GET(req: NextRequest) {
       const curOrders = curResult.data ?? [];
       const prevOrders = prevResult.data ?? [];
       comparison = {
-        current: { revenue: curOrders.reduce((s, o) => s + Number(o.total), 0), orders: curOrders.length },
-        previous: { revenue: prevOrders.reduce((s, o) => s + Number(o.total), 0), orders: prevOrders.length },
+        current: { revenue: curOrders.reduce((s: number, o: any) => s + Number(o.total), 0), orders: curOrders.length },
+        previous: { revenue: prevOrders.reduce((s: number, o: any) => s + Number(o.total), 0), orders: prevOrders.length },
       };
     }
     return NextResponse.json({ paymentBreakdown: breakdown, comparison });
@@ -121,9 +127,9 @@ export async function GET(req: NextRequest) {
     if (error) sbError(error, "analytics/customers");
     const rows = customers ?? [];
     const now = Date.now();
-    const repeat = rows.filter((c) => c.visitCount > 1).length;
-    const totalVisits = rows.reduce((s, c) => s + Number(c.visitCount), 0);
-    const totalSpend = rows.reduce((s, c) => s + Number(c.totalSpend), 0);
+    const repeat = rows.filter((c: any) => c.visitCount > 1).length;
+    const totalVisits = rows.reduce((s: number, c: any) => s + Number(c.visitCount), 0);
+    const totalSpend = rows.reduce((s: number, c: any) => s + Number(c.totalSpend), 0);
     const distribution = { new: 0, returning: 0, lapsed: 0 };
     for (const c of rows) {
       const since = c.lastVisit ? now - new Date(c.lastVisit as string).getTime() : Infinity;
@@ -206,7 +212,7 @@ export async function GET(req: NextRequest) {
     }
 
     const rows = (ingredientsResult.data ?? [])
-      .map((ing) => {
+      .map((ing: any) => {
         const perDay = usage[ing.id] ?? 0;
         const cur = stockMap.get(ing.id) ?? 0;
         return {
@@ -219,7 +225,7 @@ export async function GET(req: NextRequest) {
           reorder: cur <= Number(ing.threshold),
         };
       })
-      .sort((a, b) => (a.daysToDepletion ?? 9999) - (b.daysToDepletion ?? 9999));
+      .sort((a: any, b: any) => (a.daysToDepletion ?? 9999) - (b.daysToDepletion ?? 9999));
     return NextResponse.json({ trend: rows });
   }
 
@@ -233,9 +239,37 @@ export async function GET(req: NextRequest) {
       .limit(50);
     if (error) sbError(error, "analytics/reviews");
     const rows = reviews ?? [];
-    const avg = rows.length ? Math.round((rows.reduce((s, r) => s + Number(r.rating), 0) / rows.length) * 10) / 10 : 0;
-    const dist = [5, 4, 3, 2, 1].map((star) => ({ star, count: rows.filter((r) => r.rating === star).length }));
+    const avg = rows.length ? Math.round((rows.reduce((s: number, r: any) => s + Number(r.rating), 0) / rows.length) * 10) / 10 : 0;
+    const dist = [5, 4, 3, 2, 1].map((star) => ({ star, count: rows.filter((r: any) => r.rating === star).length }));
     return NextResponse.json({ reviews: { avg, total: rows.length, distribution: dist, recent: rows.slice(0, 20) } });
+  }
+
+  if (tab === "heatmap") {
+    let q = sb
+      .from("Order")
+      .select("total, createdAt")
+      .gte("createdAt", start.toISOString())
+      .lte("createdAt", end.toISOString())
+      .not("status", "eq", "cancelled");
+    if (locationId) q = q.eq("locationId", locationId);
+    const { data: orders, error } = await q;
+    if (error) sbError(error, "analytics/heatmap");
+
+    const matrix: HeatCell[][] = Array.from({ length: 7 }, () =>
+      Array.from({ length: 24 }, () => ({ count: 0, revenue: 0 })),
+    );
+
+    if (orders && orders.length > 0) {
+      for (const o of orders) {
+        const d = new Date(o.createdAt as string);
+        const dayIdx = d.getDay(); // 0-6
+        const hourIdx = d.getHours(); // 0-23
+        matrix[dayIdx][hourIdx].count += 1;
+        matrix[dayIdx][hourIdx].revenue += Number(o.total);
+      }
+    }
+
+    return NextResponse.json({ heatmap: matrix });
   }
 
   return NextResponse.json({ error: "unknown tab" }, { status: 400 });

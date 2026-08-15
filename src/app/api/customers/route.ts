@@ -72,7 +72,7 @@ export async function GET() {
     members: groups,
   };
 
-  const offerMap = Object.fromEntries((autoOffersResult.data ?? []).map((o) => [o.type, o]));
+  const offerMap = Object.fromEntries((autoOffersResult.data ?? []).map((o: any) => [o.type, o]));
 
   return NextResponse.json({
     customers,

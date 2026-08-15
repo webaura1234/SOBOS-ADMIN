@@ -39,7 +39,7 @@ export async function syncAutoOutOfStock(ingredientId: string) {
     .eq("ingredientId", ingredientId);
   if (stockErr) sbError(stockErr, "syncAutoOutOfStock/stock");
 
-  const total = (stockRows ?? []).reduce((sum, row) => sum + Number(row.quantity), 0);
+  const total = (stockRows ?? []).reduce((sum: number, row: any) => sum + Number(row.quantity), 0);
   const depleted = total <= 0;
 
   const { data: recipeLinks, error: linkErr } = await sb
@@ -51,7 +51,7 @@ export async function syncAutoOutOfStock(ingredientId: string) {
   const itemIds = [
     ...new Set(
       (recipeLinks ?? [])
-        .map((row) => {
+        .map((row: any) => {
           const recipe = row.Recipe as unknown as { itemId: string } | null;
           return recipe?.itemId;
         })
@@ -88,7 +88,7 @@ export async function recomputeRecipeCostsForIngredient(ingredientId: string) {
   const itemIds = [
     ...new Set(
       (recipeLinks ?? [])
-        .map((row) => {
+        .map((row: any) => {
           const recipe = row.Recipe as unknown as { itemId: string } | null;
           return recipe?.itemId;
         })

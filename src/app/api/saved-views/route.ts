@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   if (error) sbError(error, "saved-views/GET");
 
   return NextResponse.json({
-    views: (views ?? []).map((view) => ({ ...view, filters: parseFilters(view.filters as string) })),
+    views: (views ?? []).map((view: any) => ({ ...view, filters: parseFilters(view.filters as string) })),
   });
 }
 

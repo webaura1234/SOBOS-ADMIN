@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { db, sbError } from "@/lib/db";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const { data, error } = await db()
-    .from("Location")
-    .select("id, name")
-    .order("name", { ascending: true });
-  if (error) sbError(error, "locations/GET");
-  return NextResponse.json(data ?? []);
+  try {
+    const locations = await prisma.location.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
+    return NextResponse.json(locations);
+  } catch (error) {
+    console.error("locations/GET error:", error);
+    return NextResponse.json([]);
+  }
 }

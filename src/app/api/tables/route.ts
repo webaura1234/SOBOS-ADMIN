@@ -44,17 +44,17 @@ export async function GET(req: NextRequest) {
   if (sectionsResult.error) sbError(sectionsResult.error, "tables/sections");
   if (tableCountsResult.error) sbError(tableCountsResult.error, "tables/counts");
 
-  const countBySection = (tableCountsResult.data ?? []).reduce<Record<string, number>>((acc, t) => {
+  const countBySection = (tableCountsResult.data ?? []).reduce((acc: Record<string, number>, t: any) => {
     if (t.sectionId) acc[t.sectionId as string] = (acc[t.sectionId as string] ?? 0) + 1;
     return acc;
   }, {});
 
-  const tables = (tablesResult.data ?? []).map((t) => ({
+  const tables = (tablesResult.data ?? []).map((t: any) => ({
     ...t,
-    sessions: ((t.sessions as { status: string }[]) ?? []).filter((s) => s.status === "open").slice(0, 1),
+    sessions: ((t.sessions as { status: string }[]) ?? []).filter((s: any) => s.status === "open").slice(0, 1),
   }));
 
-  const sections = (sectionsResult.data ?? []).map((s) => ({
+  const sections = (sectionsResult.data ?? []).map((s: any) => ({
     ...s,
     _count: { tables: countBySection[s.id as string] ?? 0 },
   }));

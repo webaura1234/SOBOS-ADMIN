@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     if (ingredientsResult.error) sbError(ingredientsResult.error, "inventory/ingredients");
     if (suppliersResult.error) sbError(suppliersResult.error, "inventory/suppliers");
     return NextResponse.json({
-      batches: (batchesResult.data ?? []).map((b) => ({ ...b, flag: batchFlag(b.expiryDate ? new Date(b.expiryDate as string) : null) })),
+      batches: (batchesResult.data ?? []).map((b: any) => ({ ...b, flag: batchFlag(b.expiryDate ? new Date(b.expiryDate as string) : null) })),
       ingredients: ingredientsResult.data ?? [],
       suppliers: suppliersResult.data ?? [],
     });
@@ -117,13 +117,13 @@ export async function GET(req: NextRequest) {
     if (ingredientsResult.error) sbError(ingredientsResult.error, "inventory/ingredients");
     if (poCountsResult.error) sbError(poCountsResult.error, "inventory/poCounts");
 
-    const poCountBySupplier = (poCountsResult.data ?? []).reduce<Record<string, number>>((acc, po) => {
+    const poCountBySupplier = (poCountsResult.data ?? []).reduce((acc: Record<string, number>, po: any) => {
       acc[po.supplierId as string] = (acc[po.supplierId as string] ?? 0) + 1;
       return acc;
     }, {});
 
     const suppliers = await Promise.all(
-      (suppliersResult.data ?? []).map(async (s) => {
+      (suppliersResult.data ?? []).map(async (s: any) => {
         const { data: purchaseOrders } = await sb
           .from("PurchaseOrder")
           .select("id, number, status, total, createdAt")
@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
       .select("*, priceHistory:IngredientPriceHistory(*)")
       .order("name", { ascending: true });
     if (error) sbError(error, "inventory/trends");
-    const ingredients = (data ?? []).map((ing) => ({
+    const ingredients = (data ?? []).map((ing: any) => ({
       ...ing,
       priceHistory: ((ing.priceHistory as { recordedAt: string }[]) ?? []).sort(
         (a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime(),
@@ -195,13 +195,13 @@ export async function GET(req: NextRequest) {
     const { data, error } = await sb.from("Ingredient").select("*, stock:Stock(quantity)").order("name", { ascending: true });
     if (error) sbError(error, "inventory/alerts");
     return NextResponse.json({
-      ingredients: (data ?? []).map((i) => ({
+      ingredients: (data ?? []).map((i: any) => ({
         id: i.id,
         name: i.name,
         unit: i.unit,
         threshold: i.threshold,
         alertChannels: i.alertChannels,
-        totalStock: ((i.stock as { quantity: number }[]) ?? []).reduce((s, x) => s + Number(x.quantity), 0),
+        totalStock: ((i.stock as { quantity: number }[]) ?? []).reduce((s: number, x: any) => s + Number(x.quantity), 0),
       })),
     });
   }
@@ -218,10 +218,10 @@ export async function GET(req: NextRequest) {
   let stockRows = stockResult.data ?? [];
   if (search) {
     const term = search.toLowerCase();
-    stockRows = stockRows.filter((s) => (s.ingredient as { name: string }).name.toLowerCase().includes(term));
+    stockRows = stockRows.filter((s: any) => (s.ingredient as { name: string }).name.toLowerCase().includes(term));
   }
 
-  const stock = stockRows.map((s) => {
+  const stock = stockRows.map((s: any) => {
     const perDay = usage[s.ingredientId as string] ?? 0;
     return {
       ...s,
@@ -320,7 +320,7 @@ export async function PATCH(req: NextRequest) {
         .select("*")
         .eq("purchaseOrderId", po.id);
       if (freshErr) sbError(freshErr, "inventory/receive_po/freshLines");
-      const fully = (freshLines ?? []).every((l) => Number(l.qtyReceived) >= Number(l.qtyOrdered));
+      const fully = (freshLines ?? []).every((l: any) => Number(l.qtyReceived) >= Number(l.qtyOrdered));
       const { error: poUpdateErr } = await sb
         .from("PurchaseOrder")
         .update({ status: fully ? "received" : "partially_received", updatedAt: new Date().toISOString() })

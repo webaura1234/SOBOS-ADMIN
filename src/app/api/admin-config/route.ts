@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   const { data: configs, error } = await q;
   if (error) sbError(error, "admin-config/GET");
 
-  const data = Object.fromEntries((configs ?? []).map((config) => [config.key, safeJson(config.value as string)]));
+  const data = Object.fromEntries((configs ?? []).map((config: any) => [config.key, safeJson(config.value as string)]));
   return NextResponse.json(key ? data[key] ?? {} : data);
 }
 

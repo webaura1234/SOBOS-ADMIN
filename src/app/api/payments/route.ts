@@ -35,7 +35,7 @@ export async function GET() {
 
   const config = configResult.data;
   const recentOrders = ordersResult.data ?? [];
-  const refunds = (refundsResult.data ?? []).map((r) => ({
+  const refunds = (refundsResult.data ?? []).map((r: any) => ({
     ...r,
     order: r.order,
   }));
@@ -44,25 +44,26 @@ export async function GET() {
   const period = currentPeriod();
 
   const computed = Object.values(
-    recentOrders.reduce<
-      Record<string, { source: string; orderCount: number; gross: number; commission: number; net: number }>
-    >((acc, order) => {
-      const rate = commissionRates[order.source as keyof typeof commissionRates] ?? 0;
-      const commission = Math.round(Number(order.total) * rate) / 100;
-      const row = acc[order.source] ?? { source: order.source, orderCount: 0, gross: 0, commission: 0, net: 0 };
-      row.orderCount += 1;
-      row.gross += Number(order.total);
-      row.commission += commission;
-      row.net += Number(order.total) - commission;
-      acc[order.source] = row;
-      return acc;
-    }, {}),
+    recentOrders.reduce(
+      (acc: Record<string, { source: string; orderCount: number; gross: number; commission: number; net: number }>, order: any) => {
+        const rate = commissionRates[order.source as keyof typeof commissionRates] ?? 0;
+        const commission = Math.round(Number(order.total) * rate) / 100;
+        const row = acc[order.source] ?? { source: order.source, orderCount: 0, gross: 0, commission: 0, net: 0 };
+        row.orderCount += 1;
+        row.gross += Number(order.total);
+        row.commission += commission;
+        row.net += Number(order.total) - commission;
+        acc[order.source] = row;
+        return acc;
+      },
+      {},
+    ),
   );
 
-  const aggregatorRows = computed.filter((r) => ["swiggy", "zomato", "ondc"].includes(r.source));
-  const existingMap = new Map((settlementsResult.data ?? []).map((s) => [s.source, s]));
-  const settlements = computed.map((r) => {
-    const rec = existingMap.get(r.source);
+  const aggregatorRows = computed.filter((r: any) => ["swiggy", "zomato", "ondc"].includes(r.source));
+  const existingMap = new Map((settlementsResult.data ?? []).map((s: any) => [s.source, s]));
+  const settlements = computed.map((r: any) => {
+    const rec = existingMap.get(r.source) as { status?: string; id?: string } | undefined;
     return {
       ...r,
       period,
@@ -77,7 +78,7 @@ export async function GET() {
     settlements,
     reconciliations,
     period,
-    aggregatorSources: aggregatorRows.map((r) => r.source),
+    aggregatorSources: aggregatorRows.map((r: any) => r.source),
   });
 }
 

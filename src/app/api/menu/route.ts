@@ -85,17 +85,17 @@ export async function GET(req: NextRequest) {
   if (seasonalResult.error) sbError(seasonalResult.error, "menu/seasonal");
   if (menuItemsForCount.error) sbError(menuItemsForCount.error, "menu/itemCounts");
 
-  const countByCategory = (menuItemsForCount.data ?? []).reduce<Record<string, number>>((acc, row) => {
+  const countByCategory = (menuItemsForCount.data ?? []).reduce((acc: Record<string, number>, row: any) => {
     if (row.categoryId) acc[row.categoryId as string] = (acc[row.categoryId as string] ?? 0) + 1;
     return acc;
   }, {});
 
-  const categories = (categoriesResult.data ?? []).map((cat) => ({
+  const categories = (categoriesResult.data ?? []).map((cat: any) => ({
     ...cat,
     _count: { items: countByCategory[cat.id as string] ?? 0 },
   }));
 
-  const items = (itemsResult.data ?? []).map((item) => normalizeMenuItem(item as Record<string, unknown>));
+  const items = (itemsResult.data ?? []).map((item: any) => normalizeMenuItem(item as Record<string, unknown>));
 
   return NextResponse.json({
     items,

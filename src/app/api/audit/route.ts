@@ -41,13 +41,13 @@ export async function GET(req: NextRequest) {
   if (facetErr) sbError(facetErr, "audit/facets");
 
   const facets = {
-    actors: [...new Set((all ?? []).map((a) => a.actorName))].sort(),
-    actions: [...new Set((all ?? []).map((a) => a.action))].sort(),
-    resources: [...new Set((all ?? []).map((a) => a.resourceType))].sort(),
+    actors: [...new Set((all ?? []).map((a: any) => a.actorName))].sort(),
+    actions: [...new Set((all ?? []).map((a: any) => a.action))].sort(),
+    resources: [...new Set((all ?? []).map((a: any) => a.resourceType))].sort(),
   };
 
-  const withPriority = (logs ?? []).map((l) => ({ ...l, priority: isHighPriority(l.action, l.resourceType) }));
-  const highPriority = withPriority.filter((l) => l.priority).slice(0, 10);
+  const withPriority = (logs ?? []).map((l: any) => ({ ...l, priority: isHighPriority(l.action, l.resourceType) }));
+  const highPriority = withPriority.filter((l: any) => l.priority).slice(0, 10);
 
   const { data: batches, error: batchErr } = await sb
     .from("Batch")
@@ -55,12 +55,12 @@ export async function GET(req: NextRequest) {
     .order("expiryDate", { ascending: true });
   if (batchErr) sbError(batchErr, "audit/batches");
 
-  const fssai = (batches ?? []).map((b) => {
+  const fssai = (batches ?? []).map((b: any) => {
     const ingredient = b.ingredient as { name: string; stock: { quantity: number }[] };
     const supplier = b.supplier as { name: string; fssaiLicense: string } | null;
     const now = Date.now();
     const expiry = b.expiryDate ? new Date(b.expiryDate as string).getTime() : null;
-    const currentStock = (ingredient.stock ?? []).reduce((s, x) => s + Number(x.quantity), 0);
+    const currentStock = (ingredient.stock ?? []).reduce((s: number, x: any) => s + Number(x.quantity), 0);
     let flag = "compliant";
     if (!supplier?.fssaiLicense || !b.mfgDate || !b.expiryDate) flag = "incomplete";
     else if (expiry && expiry < now) flag = "expired";

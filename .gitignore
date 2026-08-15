@@ -47,3 +47,6 @@ db.sqlite
 
 # prisma generated client
 /src/generated/prisma
+
+# scratch directory
+/scratch/

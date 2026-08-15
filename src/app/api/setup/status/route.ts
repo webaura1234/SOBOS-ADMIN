@@ -46,7 +46,7 @@ export async function GET() {
     }
 
     const { data: restaurantUsers } = await sb.from("User").select("id").eq("restaurantId", restaurantId);
-    const userIds = (restaurantUsers ?? []).map((u) => u.id);
+    const userIds = (restaurantUsers ?? []).map((u: any) => u.id);
     if (userIds.length > 0) {
       const { count, error } = await sb
         .from("UserLocationRole")

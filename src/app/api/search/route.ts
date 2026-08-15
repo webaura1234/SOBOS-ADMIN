@@ -86,28 +86,28 @@ export async function GET(req: NextRequest) {
     .slice(0, limit);
 
   const results: SearchResult[] = [
-    ...orders.map((o) => ({
+    ...orders.map((o: any) => ({
       id: o.id,
       type: "order" as const,
       label: o.number,
       sublabel: [o.tableLabel, o.status, `₹${Math.round(Number(o.total))}`].filter(Boolean).join(" · "),
       href: `/orders?open=${o.id}`,
     })),
-    ...menuItems.map((m) => ({
+    ...menuItems.map((m: any) => ({
       id: m.id,
       type: "menu" as const,
       label: m.name,
       sublabel: [m.category?.name, m.availability].filter(Boolean).join(" · "),
       href: `/menu?open=${m.id}`,
     })),
-    ...customers.map((c) => ({
+    ...customers.map((c: any) => ({
       id: c.id,
       type: "customer" as const,
       label: c.name,
       sublabel: [c.phone, c.tier].filter(Boolean).join(" · "),
       href: `/customers?open=${c.id}`,
     })),
-    ...staff.map((s) => ({
+    ...staff.map((s: any) => ({
       id: s.id,
       type: "staff" as const,
       label: s.name,

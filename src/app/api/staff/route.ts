@@ -45,8 +45,8 @@ export async function GET(req: NextRequest) {
     if (locationsResult.error) sbError(locationsResult.error, "staff/locations");
     if (swapsResult.error) sbError(swapsResult.error, "staff/swaps");
     const schedule = scheduleResult.data ?? [];
-    const covered = new Set(schedule.map((s) => s.dayOfWeek));
-    const gaps = [0, 1, 2, 3, 4, 5, 6].filter((d) => !covered.has(d));
+    const covered = new Set(schedule.map((s: any) => s.dayOfWeek));
+    const gaps = [0, 1, 2, 3, 4, 5, 6].filter((d: number) => !covered.has(d));
     return NextResponse.json({
       schedule,
       staff: staffResult.data ?? [],
@@ -63,14 +63,14 @@ export async function GET(req: NextRequest) {
       .eq("status", "active");
     if (error) sbError(error, "staff/performance");
     const leaderboard = (users ?? [])
-      .map((u) => {
+      .map((u: any) => {
         const attendance = (u.attendance as { clockIn: string; clockOut: string | null; isLate: boolean }[]) ?? [];
         const shifts = attendance.length;
         const hours = attendance.reduce(
-          (s, a) => s + Math.max(0, ((a.clockOut ? new Date(a.clockOut) : new Date()).getTime() - new Date(a.clockIn).getTime()) / 3600000),
+          (s: number, a: any) => s + Math.max(0, ((a.clockOut ? new Date(a.clockOut) : new Date()).getTime() - new Date(a.clockIn).getTime()) / 3600000),
           0,
         );
-        const onTime = attendance.filter((a) => !a.isLate).length;
+        const onTime = attendance.filter((a: any) => !a.isLate).length;
         const role = (u.locationRoles as { role: { name: string } }[])?.[0]?.role.name ?? "Staff";
         return {
           id: u.id,
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
           avgShift: shifts ? Math.round((hours / shifts) * 10) / 10 : 0,
         };
       })
-      .sort((a, b) => b.hours - a.hours);
+      .sort((a: any, b: any) => b.hours - a.hours);
     return NextResponse.json({ leaderboard });
   }
 
@@ -94,10 +94,10 @@ export async function GET(req: NextRequest) {
       .eq("status", "active")
       .order("name", { ascending: true });
     if (error) sbError(error, "staff/payroll");
-    const payroll = (users ?? []).map((user) => {
+    const payroll = (users ?? []).map((user: any) => {
       const attendance = (user.attendance as { clockIn: string; clockOut: string | null }[]) ?? [];
       const hours = attendance.reduce(
-        (sum, row) =>
+        (sum: number, row: any) =>
           sum + Math.max(0, ((row.clockOut ? new Date(row.clockOut) : new Date()).getTime() - new Date(row.clockIn).getTime()) / 3600000),
         0,
       );
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
   if (rolesResult.error) sbError(rolesResult.error, "staff/roles");
   if (locationsResult.error) sbError(locationsResult.error, "staff/locations");
 
-  const staff = (staffResult.data ?? []).map((u) => ({
+  const staff = (staffResult.data ?? []).map((u: any) => ({
     ...u,
     attendance: ((u.attendance as { clockIn: string }[]) ?? [])
       .sort((a, b) => new Date(b.clockIn).getTime() - new Date(a.clockIn).getTime())
@@ -211,7 +211,7 @@ export async function POST(req: NextRequest) {
       const { data: roles } = await sb.from("Role").select("id, name");
       const { data: locations } = await sb.from("Location").select("id, name");
       const { data: existingUsers } = await sb.from("User").select("phone").eq("restaurantId", restaurantId);
-      const existing = new Set((existingUsers ?? []).map((u) => u.phone));
+      const existing = new Set((existingUsers ?? []).map((u: any) => u.phone));
       const seen = new Set<string>();
       const results: { row: number; phone: string; ok: boolean; error?: string }[] = [];
       let created = 0;
@@ -226,8 +226,8 @@ export async function POST(req: NextRequest) {
           results.push({ row: i + 1, phone, ok: false, error: "Duplicate phone" });
           continue;
         }
-        const role = (roles ?? []).find((x) => x.name.toLowerCase() === (r.role ?? "").toLowerCase());
-        const loc = (locations ?? []).find((x) => x.name.toLowerCase() === (r.location ?? "").toLowerCase());
+        const role = (roles ?? []).find((x: any) => x.name.toLowerCase() === (r.role ?? "").toLowerCase());
+        const loc = (locations ?? []).find((x: any) => x.name.toLowerCase() === (r.location ?? "").toLowerCase());
         try {
           const userId = crypto.randomUUID();
           const { error: userErr } = await sb.from("User").insert({

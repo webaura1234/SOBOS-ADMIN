@@ -40,17 +40,17 @@ export async function GET() {
   if (assignmentsResult.error) sbError(assignmentsResult.error, "settings/assignments");
   if (rolePermissionsResult.error) sbError(rolePermissionsResult.error, "settings/rolePermissions");
 
-  const assignmentCountByRole = (assignmentsResult.data ?? []).reduce<Record<string, number>>((acc, a) => {
+  const assignmentCountByRole = (assignmentsResult.data ?? []).reduce((acc: Record<string, number>, a: any) => {
     acc[a.roleId as string] = (acc[a.roleId as string] ?? 0) + 1;
     return acc;
   }, {});
-  const permissionCountByRole = (rolePermissionsResult.data ?? []).reduce<Record<string, number>>((acc, rp) => {
+  const permissionCountByRole = (rolePermissionsResult.data ?? []).reduce((acc: Record<string, number>, rp: any) => {
     acc[rp.roleId as string] = (acc[rp.roleId as string] ?? 0) + 1;
     return acc;
   }, {});
 
   const rolesWithDetails = await Promise.all(
-    (rolesResult.data ?? []).map(async (role) => {
+    (rolesResult.data ?? []).map(async (role: any) => {
       const { data: permissions } = await sb
         .from("RolePermission")
         .select("permission:Permission(*)")
@@ -66,7 +66,7 @@ export async function GET() {
     }),
   );
 
-  const locations = (locationsResult.data ?? []).map((loc) => ({
+  const locations = (locationsResult.data ?? []).map((loc: any) => ({
     ...loc,
     operatingHours: ((loc.operatingHours as { dayOfWeek: number; openTime: string }[]) ?? []).sort((a, b) => {
       if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
@@ -307,13 +307,13 @@ export async function DELETE(req: NextRequest) {
         .select("permission:Permission(resource)")
         .eq("roleId", id);
       if (permErr) sbError(permErr, "settings/role/permissions");
-      const isFullAdmin = (perms ?? []).some((p) => (p.permission as unknown as { resource: string }).resource === "*");
+      const isFullAdmin = (perms ?? []).some((p: any) => (p.permission as unknown as { resource: string }).resource === "*");
       if (isFullAdmin) {
         const { data: allRoles } = await sb.from("Role").select("id").eq("restaurantId", role.restaurantId);
         let adminCount = 0;
         for (const r of allRoles ?? []) {
           const { data: rp } = await sb.from("RolePermission").select("permission:Permission(resource)").eq("roleId", r.id);
-          if ((rp ?? []).some((p) => (p.permission as unknown as { resource: string }).resource === "*")) adminCount += 1;
+          if ((rp ?? []).some((p: any) => (p.permission as unknown as { resource: string }).resource === "*")) adminCount += 1;
         }
         if (adminCount <= 1)
           return NextResponse.json({ error: "Cannot delete the last full-admin role" }, { status: 400 });
