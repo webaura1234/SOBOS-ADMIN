@@ -20,9 +20,14 @@ export function Drawer({ open, onClose, title, children, width = "520px" }: Draw
     if (!dialog) return;
     if (open) {
       dialog.showModal();
+      document.body.style.overflow = "hidden";
     } else {
       dialog.close();
+      document.body.style.overflow = "";
     }
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open]);
 
   useEffect(() => {
@@ -39,21 +44,21 @@ export function Drawer({ open, onClose, title, children, width = "520px" }: Draw
   return (
     <dialog
       ref={ref}
-      className="fixed inset-0 z-50 m-0 h-full w-full max-h-full max-w-full bg-transparent p-0 backdrop:bg-[var(--scrim)]"
+      className="fixed inset-0 z-50 m-0 h-full w-full max-h-full max-w-full bg-transparent p-0 border-none outline-none overflow-hidden backdrop:bg-[var(--scrim)]"
       onClose={onClose}
     >
       <div className="flex h-full justify-end" onClick={(e) => e.target === e.currentTarget && onClose()}>
         <div
-          className="h-full bg-surface-2 border-l border-border shadow-2xl flex flex-col"
-          style={{ width, maxWidth: "100vw" }}
+          className="h-full bg-surface-2 border-l border-border shadow-2xl flex flex-col w-full sm:w-[520px] max-w-full ml-auto"
+          style={width && width !== "520px" ? { width, maxWidth: "100vw" } : undefined}
         >
-          <div className="flex items-center justify-between px-5 border-b border-border bg-surface-3" style={{ height: "var(--header-h)" }}>
+          <div className="flex items-center justify-between px-5 border-b border-border bg-surface-3 shrink-0" style={{ height: "var(--header-h)" }}>
             <h2 className="font-bold text-xl text-text-primary">{title}</h2>
             <button type="button" onClick={onClose} className="p-2.5 rounded-xl hover:bg-surface-2 text-text-muted hover:text-text-primary focus-ring" aria-label="Close">
               <X size={20} />
             </button>
           </div>
-          <div className="flex-1 overflow-auto p-5 scrollbar-thin">{children}</div>
+          <div className="flex-1 overflow-y-auto p-5 scrollbar-thin">{children}</div>
         </div>
       </div>
     </dialog>
@@ -150,7 +155,6 @@ export function FilterBar({ search, onSearchChange, filters, actions, placeholde
       <div className="relative flex-1 min-w-[240px] max-w-lg">
         <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
         <input
-          id="global-search"
           type="search"
           placeholder={placeholder}
           value={search}

@@ -89,13 +89,7 @@ export function Header() {
   };
 
   const openQuickFind = () => {
-    const pageSearch = document.getElementById("global-search") as HTMLInputElement | null;
-    if (pageSearch) {
-      pageSearch.focus();
-      pageSearch.scrollIntoView({ behavior: "smooth", block: "center" });
-    } else {
-      setGlobalSearchOpen(true);
-    }
+    setGlobalSearchOpen(true);
   };
 
   const signOut = async () => {

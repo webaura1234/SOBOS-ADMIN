@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
   }[];
 
   const inventoryMatches = stock
-    .filter((s) => s.ingredient.name.toLowerCase().includes(q.toLowerCase()))
+    .filter((s) => s.ingredient?.name?.toLowerCase().includes(q.toLowerCase()))
     .slice(0, limit);
 
   const results: SearchResult[] = [

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, sbError } from "@/lib/db";
 
 export async function GET() {
+  try {
   const sb = db();
   const [notifResult, countResult] = await Promise.all([
     sb.from("Notification").select("*").order("createdAt", { ascending: false }).limit(20),
@@ -13,6 +14,10 @@ export async function GET() {
     notifications: notifResult.data ?? [],
     unreadCount: countResult.count ?? 0,
   });
+  } catch (err) {
+    console.warn("notifications: queries failed", err);
+    return NextResponse.json({ notifications: [], unreadCount: 0 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {

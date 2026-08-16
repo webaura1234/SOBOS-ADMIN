@@ -429,7 +429,7 @@ function MenuPageContent() {
         {drawerTab === "variants" && (
           <div className="space-y-6">
             <section>
-              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-black">Size Variants</h3>
+              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-text-primary">Size Variants</h3>
                 <BtnSecondary onClick={() => setVariants([...variants, { label: "", price: form.basePrice, recipeNote: "" }])}><Plus size={16} /> Add Variant</BtnSecondary></div>
               <div className="space-y-2">
                 {variants.map((v, i) => (

@@ -209,7 +209,7 @@ export async function GET(req: NextRequest) {
   let stockQ = sb
     .from("Stock")
     .select("*, ingredient:Ingredient(*), location:Location(id, name)")
-    .order("ingredient(name)", { ascending: true });
+    .order("ingredient.name", { ascending: true });
   if (locationId) stockQ = stockQ.eq("locationId", locationId);
 
   const [stockResult, usage] = await Promise.all([stockQ, computeDailyUsage()]);
@@ -218,7 +218,9 @@ export async function GET(req: NextRequest) {
   let stockRows = stockResult.data ?? [];
   if (search) {
     const term = search.toLowerCase();
-    stockRows = stockRows.filter((s: any) => (s.ingredient as { name: string }).name.toLowerCase().includes(term));
+    stockRows = stockRows.filter((s: any) =>
+      Boolean(s.ingredient?.name && String(s.ingredient.name).toLowerCase().includes(term))
+    );
   }
 
   const stock = stockRows.map((s: any) => {

@@ -95,7 +95,7 @@ function InventoryPageContent() {
   }, [searchParams]);
   useEffect(() => { if (trendIngredients.length && !trendIngId) setTrendIngId(trendIngredients[0].id); }, [trendIngredients, trendIngId]);
 
-  const visibleStock = useMemo(() => (lowStockOnly ? stock.filter((s) => s.quantity <= s.ingredient.threshold) : stock), [stock, lowStockOnly]);
+  const visibleStock = useMemo(() => (lowStockOnly ? stock.filter((s) => s.ingredient && s.quantity <= s.ingredient.threshold) : stock), [stock, lowStockOnly]);
 
   // ── actions ──
   const openAdjust = (row: StockRow) => { setAdjust(row); setAdjustForm({ mode: "set", value: row.quantity, reason: ADJUST_REASONS[0], note: "" }); };

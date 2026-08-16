@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { InsightCard } from "./InsightCard";
 import { CreditCard, ShoppingBag, Store, Smartphone, QrCode } from "lucide-react";
+import { ChartContainer } from "@/components/ui/chart-container";
 import {
   AreaChart,
   Area,
@@ -11,7 +12,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 
 export interface PaymentRow {
@@ -21,8 +21,10 @@ export interface PaymentRow {
 }
 
 export interface ComparisonData {
+  mode?: string;
   current: { revenue: number; orders: number };
   previous: { revenue: number; orders: number };
+  diffPercentage?: { revenue: number; orders: number };
 }
 
 interface SalesChannelsViewProps {
@@ -281,9 +283,8 @@ export function SalesChannelsView({
             </p>
           </div>
 
-          <div className="h-[300px] w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={channelTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer height={300} className="pt-2">
+            <AreaChart data={channelTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
                 <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#B8AA96" }} />
                 <YAxis tick={{ fontSize: 11, fill: "#B8AA96" }} />
@@ -303,8 +304,7 @@ export function SalesChannelsView({
                   />
                 ))}
               </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         </div>
       </div>
     </div>

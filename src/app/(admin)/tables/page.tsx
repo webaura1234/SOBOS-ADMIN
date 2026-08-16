@@ -8,7 +8,7 @@ import { formatCurrency, cn, naturalSortLabel } from "@/lib/utils";
 import { apiFetch, useToast } from "@/lib/toast";
 import { useApp } from "@/lib/context";
 import { useInterval } from "@/lib/use-interval";
-import { Download, Plus, Save, Trash2, QrCode, RefreshCw, Users, Layers, Printer, Wand2 } from "lucide-react";
+import { Download, Plus, Save, Trash2, QrCode, RefreshCw, Users, Layers, Printer, Wand2, Grid } from "lucide-react";
 
 interface Session { id: string; guestCount: number; serverName: string | null; guestName: string | null; guestPhone: string | null; specialRequests: string | null; orderTotal: number; }
 interface TableRow { id: string; label: string; section: { id: string; name: string } | null; minCapacity: number; maxCapacity: number; shape: string; status: string; posX: number; posY: number; qrCode: string | null; sessions: Session[]; }
@@ -46,13 +46,55 @@ export default function TablesPage() {
   const [allocResult, setAllocResult] = useState<{ suggestion: TableRow | null; alternatives: TableRow[] } | null>(null);
   const locId = locationId ?? locations[0]?.id ?? "";
 
+  const autoArrangeGrid = useCallback(async (listOverride?: TableRow[]) => {
+    const list = listOverride ?? tables;
+    if (list.length === 0) return;
+    const sorted = [...list].sort((a, b) => naturalSortLabel(a.label, b.label));
+    const cols = 5;
+    const itemW = 100;
+    const itemH = 100;
+    const startX = 30;
+    const startY = 30;
+
+    const positions = sorted.map((t, idx) => ({
+      id: t.id,
+      posX: startX + (idx % cols) * (itemW + 20),
+      posY: startY + Math.floor(idx / cols) * (itemH + 20),
+    }));
+
+    setTables((prev) =>
+      prev.map((t) => {
+        const found = positions.find((p) => p.id === t.id);
+        return found ? { ...t, posX: found.posX, posY: found.posY } : t;
+      })
+    );
+
+    try {
+      await apiFetch("/api/tables", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "batch_positions", positions }),
+      });
+      toast("Floor map grid layout saved");
+    } catch {
+      toast("Could not save layout", "error");
+    }
+  }, [tables, toast]);
+
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (locId) params.set("locationId", locId);
-    if (statusFilter && tab === "board") params.set("status", statusFilter);
     const data = await apiFetch<{ tables: TableRow[]; sections: Section[] }>(`/api/tables?${params}`);
-    setTables(data.tables); setSections(data.sections);
-  }, [locId, statusFilter, tab]);
+    setTables(data.tables);
+    setSections(data.sections);
+
+    if (data.tables.length > 1) {
+      const allAtOrigin = data.tables.every((t) => (t.posX || 0) === 0 && (t.posY || 0) === 0);
+      if (allAtOrigin) {
+        autoArrangeGrid(data.tables);
+      }
+    }
+  }, [locId, autoArrangeGrid]);
+
   useEffect(() => { load().catch((e) => toast(e.message, "error")); }, [load, toast]);
   useEffect(() => { apiFetch<typeof TABLE_CFG_DEFAULT>("/api/admin-config?scope=tables&key=config").then((c) => setCfg({ ...TABLE_CFG_DEFAULT, ...c })).catch(() => {}); }, []);
   // Live status board: 10s REST poll fallback (F-39).
@@ -67,6 +109,55 @@ export default function TablesPage() {
     cleaning: tables.filter((t) => t.status === "cleaning").length,
   }), [tables]);
 
+  const handlePointerDown = (e: React.PointerEvent, table: TableRow) => {
+    if (e.button !== 0) return;
+    const element = e.currentTarget as HTMLElement;
+    element.setPointerCapture(e.pointerId);
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialPosX = table.posX || 0;
+    const initialPosY = table.posY || 0;
+    let hasMoved = false;
+
+    const onPointerMove = (moveEv: PointerEvent) => {
+      const dx = moveEv.clientX - startX;
+      const dy = moveEv.clientY - startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        hasMoved = true;
+      }
+      const newX = Math.max(0, Math.round(initialPosX + dx));
+      const newY = Math.max(0, Math.round(initialPosY + dy));
+      setTables((prev) =>
+        prev.map((t) => (t.id === table.id ? { ...t, posX: newX, posY: newY } : t))
+      );
+    };
+
+    const onPointerUp = (upEv: PointerEvent) => {
+      try {
+        element.releasePointerCapture(upEv.pointerId);
+      } catch {}
+      element.removeEventListener("pointermove", onPointerMove);
+      element.removeEventListener("pointerup", onPointerUp);
+
+      if (hasMoved) {
+        const dx = upEv.clientX - startX;
+        const dy = upEv.clientY - startY;
+        const finalX = Math.max(0, Math.round(initialPosX + dx));
+        const finalY = Math.max(0, Math.round(initialPosY + dy));
+        apiFetch("/api/tables", {
+          method: "PATCH",
+          body: JSON.stringify({ id: table.id, posX: finalX, posY: finalY }),
+        }).catch(() => toast("Could not move table", "error"));
+      } else {
+        openEdit(table);
+      }
+    };
+
+    element.addEventListener("pointermove", onPointerMove);
+    element.addEventListener("pointerup", onPointerUp);
+  };
+
   const saveTable = async () => {
     try {
       if (!form.label.trim()) { toast("Label required", "error"); return; }
@@ -76,9 +167,56 @@ export default function TablesPage() {
     } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); }
   };
   const deleteTable = async (id: string, reason?: string) => { try { await apiFetch(`/api/tables?id=${id}&reason=${encodeURIComponent(reason ?? "")}`, { method: "DELETE" }); toast("Table deleted"); setDetail(null); load(); } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); } };
-  const addSection = async () => { if (!newSection.trim() || !locId) return; try { await apiFetch("/api/tables", { method: "POST", body: JSON.stringify({ type: "section", locationId: locId, name: newSection }) }); toast("Section created"); setNewSection(""); load(); } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); } };
-  const saveSection = async () => { if (!editSection) return; try { await apiFetch("/api/tables", { method: "PATCH", body: JSON.stringify({ type: "section", id: editSection.id, name: editSection.name }) }); toast("Section renamed"); setEditSection(null); load(); } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); } };
-  const deleteSection = async () => { if (!confirmSection) return; try { await apiFetch(`/api/tables?id=${confirmSection.id}&type=section`, { method: "DELETE" }); toast("Section deleted, tables unsectioned"); setConfirmSection(null); load(); } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); } };
+  const addSection = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newSection.trim()) {
+      toast("Please enter a section name", "error");
+      return;
+    }
+    const targetLoc = locId || locations[0]?.id;
+    try {
+      await apiFetch("/api/tables", {
+        method: "POST",
+        body: JSON.stringify({ type: "section", locationId: targetLoc || null, name: newSection.trim() }),
+      });
+      toast(`Section "${newSection.trim()}" created`);
+      setNewSection("");
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to create section", "error");
+    }
+  };
+
+  const saveSection = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editSection || !editSection.name.trim()) {
+      toast("Section name required", "error");
+      return;
+    }
+    try {
+      await apiFetch("/api/tables", {
+        method: "PATCH",
+        body: JSON.stringify({ type: "section", id: editSection.id, name: editSection.name.trim() }),
+      });
+      toast("Section renamed");
+      setEditSection(null);
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to rename section", "error");
+    }
+  };
+
+  const deleteSection = async () => {
+    if (!confirmSection) return;
+    try {
+      await apiFetch(`/api/tables?id=${confirmSection.id}&type=section`, { method: "DELETE" });
+      toast(`Section "${confirmSection.name}" deleted`);
+      setConfirmSection(null);
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Failed to delete section", "error");
+    }
+  };
   const bulkAdd = async () => { try { const r = await apiFetch<{ created: number }>("/api/tables", { method: "POST", body: JSON.stringify({ type: "bulk", locationId: locId, ...bulkForm, sectionId: bulkForm.sectionId || null }) }); toast(`${r.created} tables added`); setShowBulk(false); load(); } catch (e) { toast(e instanceof Error ? e.message : "Failed", "error"); } };
 
   const openCreate = () => { setCreating(true); setDetail(null); setForm({ label: "", minCapacity: 2, maxCapacity: 4, shape: "square", sectionId: "", status: "available", posX: 0, posY: 0 }); };
@@ -114,10 +252,10 @@ export default function TablesPage() {
         actions={<div className="flex gap-2"><BtnSecondary onClick={() => { setBulkForm({ ...bulkForm, sectionId: "", startNumber: tables.length + 1 }); setShowBulk(true); }}><Layers size={18} /> Bulk Add</BtnSecondary><BtnSecondary onClick={downloadQrs}><Download size={18} /> QR Export</BtnSecondary><BtnPrimary onClick={openCreate}><Plus size={18} /> Add Table</BtnPrimary></div>} />
 
       <StatCards stats={[
-        { label: "Available", value: statusCounts.available, tone: "success", hint: "Ready", onClick: () => { setStatusFilter("available"); setTab("list"); } },
-        { label: "Occupied", value: statusCounts.occupied, tone: "danger", hint: "Dining", onClick: () => { setStatusFilter("occupied"); setTab("list"); } },
-        { label: "Reserved", value: statusCounts.reserved, tone: "warning", hint: "Booked", onClick: () => { setStatusFilter("reserved"); setTab("list"); } },
-        { label: "Cleaning", value: statusCounts.cleaning, tone: "active", hint: "Resetting", onClick: () => { setStatusFilter("cleaning"); setTab("list"); } },
+        { label: "Available", value: statusCounts.available, tone: "success", hint: "Ready", onClick: () => setStatusFilter(statusFilter === "available" ? "" : "available") },
+        { label: "Occupied", value: statusCounts.occupied, tone: "danger", hint: "Dining", onClick: () => setStatusFilter(statusFilter === "occupied" ? "" : "occupied") },
+        { label: "Reserved", value: statusCounts.reserved, tone: "warning", hint: "Booked", onClick: () => setStatusFilter(statusFilter === "reserved" ? "" : "reserved") },
+        { label: "Cleaning", value: statusCounts.cleaning, tone: "active", hint: "Resetting", onClick: () => setStatusFilter(statusFilter === "cleaning" ? "" : "cleaning") },
       ]} />
 
       <TabBar tabs={[{ id: "board", label: "Floor Map" }, { id: "list", label: "Table List" }, { id: "sections", label: "Sections" }, { id: "qr", label: "QR Codes" }, { id: "allocate", label: "Allocation" }, { id: "settings", label: "Settings" }]} active={tab} onChange={setTab} />
@@ -125,20 +263,49 @@ export default function TablesPage() {
       {(tab === "list" || tab === "board") && <ChipFilter options={filterOptions} value={statusFilter} onChange={setStatusFilter} />}
 
       {tab === "board" && (
-        <div className="page-surface p-5 min-h-[420px]">
-          <p className="text-sm font-medium text-text-muted mb-4">Drag tables to reposition · click to manage · board auto-refreshes every 10s</p>
-          <div className="relative min-h-[360px] bg-[#0A0A0A] rounded-2xl border border-dashed border-border">
-            {sortedTables.length === 0 && <p className="absolute inset-0 flex items-center justify-center text-text-muted font-semibold">No tables match this filter</p>}
-            {sortedTables.map((table) => (
-              <button key={table.id} type="button" onClick={() => openEdit(table)}
-                className={cn("absolute flex flex-col items-center justify-center border-2 rounded-2xl text-sm font-bold focus-ring hover:scale-105 transition-transform shadow-sm", STATUS_COLORS[table.status], table.shape === "round" && "rounded-full")}
-                style={{ left: table.posX, top: table.posY, width: table.maxCapacity > 4 ? 92 : 76, height: table.maxCapacity > 4 ? 92 : 76 }}
-                title={`${table.label} — ${table.status}`} draggable
-                onDragEnd={(e) => { const board = e.currentTarget.parentElement?.getBoundingClientRect(); if (!board) return; apiFetch("/api/tables", { method: "PATCH", body: JSON.stringify({ id: table.id, posX: Math.max(0, e.clientX - board.left - 38), posY: Math.max(0, e.clientY - board.top - 38) }) }).then(() => load()).catch(() => toast("Could not move table", "error")); }}>
-                <span className="text-base font-extrabold text-text-primary">{table.label}</span>
-                <span className="text-[10px] font-bold capitalize mt-0.5">{table.status}</span>
-              </button>
-            ))}
+        <div className="page-surface p-5 min-h-[460px]">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <p className="text-sm font-medium text-text-muted">
+              Drag tables to reposition · click to manage · board auto-refreshes every 10s
+              {statusFilter && <span className="ml-2 font-bold text-yellow">({STATUS_LABELS[statusFilter] ?? statusFilter} highlighted)</span>}
+            </p>
+            <BtnSecondary onClick={() => autoArrangeGrid()} className="h-8 text-xs px-3 font-semibold">
+              <Grid size={14} /> Auto-Arrange Grid
+            </BtnSecondary>
+          </div>
+          <div className="relative min-h-[440px] max-w-full overflow-auto scrollbar-thin bg-background rounded-2xl border border-dashed border-border p-4">
+            {sortedTables.length === 0 && (
+              <p className="absolute inset-0 flex items-center justify-center text-text-muted font-semibold">
+                No tables match this filter
+              </p>
+            )}
+            {sortedTables.map((table) => {
+              const isMatch = !statusFilter || table.status === statusFilter;
+              return (
+                <button
+                  key={table.id}
+                  type="button"
+                  onPointerDown={(e) => isMatch && handlePointerDown(e, table)}
+                  className={cn(
+                    "absolute flex flex-col items-center justify-center border-2 rounded-2xl text-sm font-bold focus-ring transition-all shadow-sm select-none cursor-grab active:cursor-grabbing touch-none",
+                    STATUS_COLORS[table.status],
+                    table.shape === "round" && "rounded-full",
+                    !isMatch ? "opacity-25 grayscale pointer-events-none scale-90" : "hover:scale-105 shadow-md",
+                    statusFilter && isMatch && "ring-4 ring-yellow/50 scale-105 shadow-lg z-10"
+                  )}
+                  style={{
+                    left: table.posX || 0,
+                    top: table.posY || 0,
+                    width: table.maxCapacity > 4 ? 92 : 76,
+                    height: table.maxCapacity > 4 ? 92 : 76,
+                  }}
+                  title={`${table.label} — ${table.status}`}
+                >
+                  <span className="text-base font-extrabold text-text-primary">{table.label}</span>
+                  <span className="text-[10px] font-bold capitalize mt-0.5">{table.status}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -146,16 +313,71 @@ export default function TablesPage() {
       {tab === "list" && <DenseGrid columns={columns} data={filteredList} selectable={false} onRowClick={openEdit} emptyMessage="No tables found" />}
 
       {tab === "sections" && (
-        <div className="space-y-4">
-          <div className="flex gap-3 p-4 bg-surface-2 rounded-2xl border border-border">
-            <input className={inputClass + " flex-1"} placeholder="New section name (e.g. Rooftop)" value={newSection} onChange={(e) => setNewSection(e.target.value)} />
-            <BtnPrimary onClick={addSection}><Plus size={18} /> Add Section</BtnPrimary>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-6">
+          <form onSubmit={addSection} className="flex gap-3 p-4 bg-surface-2 rounded-2xl border border-border">
+            <input
+              className={inputClass + " flex-1"}
+              placeholder="New section name (e.g. Patio, Rooftop, Main Hall)"
+              value={newSection}
+              onChange={(e) => setNewSection(e.target.value)}
+            />
+            <BtnPrimary type="submit">
+              <Plus size={18} /> Add Section
+            </BtnPrimary>
+          </form>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {sections.length === 0 && (
+              <div className="col-span-2 p-8 text-center text-text-muted font-medium page-surface rounded-2xl border border-border">
+                No sections created yet. Add a section above (e.g. Patio, Rooftop, VIP Room).
+              </div>
+            )}
             {sections.map((s) => (
-              <div key={s.id} className="flex justify-between items-center p-5 page-surface">
-                <div><span className="font-bold text-lg text-text-primary">{s.name}</span><span className="ml-2 text-xs font-bold text-text-secondary bg-surface-3 border border-border px-3 py-1 rounded-full">{s._count.tables} tables</span></div>
-                <div className="flex gap-2"><button type="button" onClick={() => setEditSection({ ...s })} className="text-sm font-bold underline text-text-primary">Rename</button><button type="button" onClick={() => setConfirmSection(s)} className="text-red text-sm font-bold underline">Delete</button></div>
+              <div key={s.id} className="p-5 page-surface rounded-2xl border border-border space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-lg text-text-primary">{s.name}</span>
+                    <span className="text-xs font-bold text-text-secondary bg-surface-3 border border-border px-3 py-1 rounded-full">
+                      {s._count.tables} {s._count.tables === 1 ? "table" : "tables"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditSection({ ...s })}
+                      className="text-xs font-bold underline text-text-primary hover:text-yellow transition-colors"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmSection(s)}
+                      className="text-xs font-bold underline text-red hover:text-red/80 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border/50">
+                  <span className="text-xs font-semibold text-text-muted">Assigned Tables:</span>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {tables.filter((t) => t.section?.id === s.id).length === 0 ? (
+                      <span className="text-xs italic text-text-muted">No tables assigned</span>
+                    ) : (
+                      tables
+                        .filter((t) => t.section?.id === s.id)
+                        .map((t) => (
+                          <span
+                            key={t.id}
+                            className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg bg-surface-2 border border-border text-text-primary"
+                          >
+                            {t.label}
+                          </span>
+                        ))
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>

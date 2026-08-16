@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full" data-density="compact" suppressHydrationWarning>
+    <html lang="en" className="h-full bg-background text-foreground" data-density="compact" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -17,7 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="min-h-full antialiased" suppressHydrationWarning>
+      <body className="min-h-full bg-background text-foreground antialiased" suppressHydrationWarning>
         {children}
       </body>
     </html>

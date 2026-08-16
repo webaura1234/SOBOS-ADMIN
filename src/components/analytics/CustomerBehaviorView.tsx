@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { InsightCard } from "./InsightCard";
 import { Users, UserCheck, RefreshCw, Clock } from "lucide-react";
+import { ChartContainer } from "@/components/ui/chart-container";
 import {
   AreaChart,
   Area,
@@ -11,7 +12,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 
 export interface CustomerBehaviorData {
@@ -188,9 +188,8 @@ export function CustomerBehaviorView({
             </p>
           </div>
 
-          <div className="h-[280px] w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={activityTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer height={280} className="pt-2">
+            <AreaChart data={activityTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="customerGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#FED500" stopOpacity={0.18} />
@@ -213,8 +212,7 @@ export function CustomerBehaviorView({
                   fill="url(#customerGrad)"
                 />
               </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         </div>
 
         {/* TOP CUSTOMERS RANKING LIST (5 cols) */}

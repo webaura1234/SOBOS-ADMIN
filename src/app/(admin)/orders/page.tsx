@@ -456,7 +456,7 @@ function OrdersPageContent() {
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-auto">
                     {stationItems.map((it) => (
                       <button key={it.id} type="button" onClick={() => toggleStationItem(st, it.id)}
-                        className={cn("px-2 py-1 rounded-lg text-xs font-bold border", ids.includes(it.id) ? "bg-primary border-primary text-black" : "border-border bg-surface-3 text-text-muted")}>{it.name}</button>
+                        className={cn("px-2 py-1 rounded-lg text-xs font-bold border", ids.includes(it.id) ? "bg-primary border-primary text-on-yellow" : "border-border bg-surface-3 text-text-muted")}>{it.name}</button>
                     ))}
                   </div>
                 </div>

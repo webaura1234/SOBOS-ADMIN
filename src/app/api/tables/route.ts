@@ -68,10 +68,18 @@ export async function POST(req: NextRequest) {
     const sb = db();
 
     if (body.type === "section") {
+      let locId = body.locationId;
+      if (!locId) {
+        const { data: loc } = await sb.from("Location").select("id").limit(1).maybeSingle();
+        locId = loc?.id;
+      }
+      if (!locId) {
+        return NextResponse.json({ error: "Location ID required to create section" }, { status: 400 });
+      }
       const sectionId = crypto.randomUUID();
       const { data: section, error } = await sb
         .from("TableSection")
-        .insert({ id: sectionId, locationId: body.locationId, name: body.name })
+        .insert({ id: sectionId, locationId: locId, name: body.name })
         .select()
         .single();
       if (error) sbError(error, "tables/section/create");
@@ -164,6 +172,18 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, type, ...data } = body;
     const sb = db();
+
+    if (type === "batch_positions") {
+      const positions = body.positions as { id: string; posX: number; posY: number }[];
+      if (Array.isArray(positions)) {
+        await Promise.all(
+          positions.map((p) =>
+            sb.from("RestaurantTable").update({ posX: p.posX, posY: p.posY }).eq("id", p.id)
+          )
+        );
+      }
+      return NextResponse.json({ ok: true });
+    }
 
     if (type === "section") {
       const { data: section, error } = await sb.from("TableSection").update(data).eq("id", id).select().single();
