@@ -4,9 +4,11 @@ html, body {
   overflow: hidden;
   height: 100%;
   margin: 0;
+  color-scheme: dark;
 }
 
 :root {
+  color-scheme: dark;
   /* ─────────────────────────────────────────────────────────────
      SOBOS dark system design tokens (Exact live palette).
      Depth comes from visual surface layering without shadows:
@@ -176,6 +178,7 @@ html, body {
   --color-primary-hover: var(--primary-hover);
   --color-yellow: var(--yellow);
   --color-yellow-hover: var(--yellow-hover);
+  --color-on-yellow: var(--on-yellow);
   --color-cream: var(--cream);
   --color-cream-dark: var(--cream-dark);
   --color-sand: var(--sand);
@@ -197,10 +200,6 @@ html, body {
   --color-info: var(--info);
   --color-purple: var(--purple);
   --color-purple-surface: var(--purple-surface);
-
-  /* `bg-white` is Tailwind's literal white, not a project token. 165 call sites
-     use it to mean "card surface" — rebasing it converts them all. */
-  --color-white: var(--surface-1);
 
   /* No shadows anywhere: depth is the surface ladder. Kills 107 shadow-* uses. */
   --shadow-2xs: none;
@@ -257,6 +256,7 @@ html, body {
 html {
   font-size: var(--base-fs);
   transition: font-size 0.15s ease;
+  color-scheme: dark;
 }
 
 body {
@@ -268,15 +268,32 @@ body {
   line-height: 1.5;
   margin: 0;
   -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
 }
 
-button, a, select, input, textarea {
+button, a, select, input, textarea, dialog {
+  color-scheme: dark;
   transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+}
+
+select option {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0px 1000px var(--surface-2) inset;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 h1, h2, h3, h4 {
   font-weight: 700;
-  color: var(--black);
+  color: var(--text-primary);
 }
 
 .tabular-nums {

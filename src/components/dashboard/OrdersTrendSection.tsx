@@ -5,6 +5,7 @@ import Link from "next/link";
 import { cn, formatCurrency } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import { format } from "date-fns";
+import { ChartContainer } from "@/components/ui/chart-container";
 import {
   AreaChart,
   Area,
@@ -13,7 +14,6 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceDot,
-  ResponsiveContainer,
 } from "recharts";
 
 export interface HourlyBucket {
@@ -111,8 +111,8 @@ export function OrdersChartCard({
       {loading ? (
         <div className="mx-4 mb-4 h-[165px] rounded-md bg-surface-3" />
       ) : (
-        <div className="h-[165px] w-full px-2">
-          <ResponsiveContainer width="100%" height="100%" minHeight={140}>
+        <div className="h-[165px] w-full px-2 min-w-0">
+          <ChartContainer height={165}>
             <AreaChart data={chartData} margin={{ top: 8, right: 14, left: -12, bottom: 0 }}>
               <defs>
                 <linearGradient id="sobosTrendFill" x1="0" y1="0" x2="0" y2="1">
@@ -180,7 +180,7 @@ export function OrdersChartCard({
                 />
               )}
             </AreaChart>
-          </ResponsiveContainer>
+          </ChartContainer>
         </div>
       )}
 

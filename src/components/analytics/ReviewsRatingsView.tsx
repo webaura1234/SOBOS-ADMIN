@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { InsightCard } from "./InsightCard";
 import { AnalyticsEmptyState } from "./AnalyticsEmptyState";
 import { Star, MessageSquare, ExternalLink } from "lucide-react";
+import { ChartContainer } from "@/components/ui/chart-container";
 import {
   LineChart,
   Line,
@@ -12,7 +13,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 
 export interface ReviewItem {
@@ -195,9 +195,8 @@ export function ReviewsRatingsView({
             </p>
           </div>
 
-          <div className="h-[250px] w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={ratingTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer height={250} className="pt-2">
+            <LineChart data={ratingTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#7A7A7A" }} />
                 <YAxis domain={[3, 5]} tick={{ fontSize: 11, fill: "#7A7A7A" }} />
@@ -213,8 +212,7 @@ export function ReviewsRatingsView({
                   dot={{ r: 5, fill: "#FED500", stroke: "#0A0A0A", strokeWidth: 2 }}
                 />
               </LineChart>
-            </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         </div>
       </div>
 

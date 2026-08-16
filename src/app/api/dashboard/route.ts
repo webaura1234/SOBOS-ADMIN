@@ -19,17 +19,20 @@ export async function GET(req: NextRequest) {
   const lastWeekHourEnd = new Date(lastWeekHourStart);
   lastWeekHourEnd.setHours(currentHour + 1, 0, 0, 0);
 
-  const [
-    ordersToday,
-    revenueRows,
-    orders,
-    alertsResult,
-    lastWeekSameHourCount,
-    activeOrders,
-    occupiedTables,
-    stockResult,
-    recentOrdersResult,
-  ] = await Promise.all([
+  const useMock = req.nextUrl.searchParams.get("mock") === "true" || process.env.DASHBOARD_USE_MOCK_DATA !== "false";
+
+  let ordersToday = 0;
+  let revenueRows: { total: number }[] = [];
+  let orders: { total: number; createdAt: string }[] = [];
+  let alertsResult: unknown[] = [];
+  let lastWeekSameHourCount = 0;
+  let activeOrders: unknown[] = [];
+  let occupiedTables = 0;
+  let stockResult: unknown[] = [];
+  let recentOrdersResult: unknown[] = [];
+
+  try {
+  const results = await Promise.all([
     (async () => {
       let q = sb.from("Order").select("*", { count: "exact", head: true }).gte("createdAt", todayIso);
       if (locationId) q = q.eq("locationId", locationId);
@@ -110,8 +113,20 @@ export async function GET(req: NextRequest) {
       return data ?? [];
     })(),
   ]);
+    ordersToday = results[0];
+    revenueRows = results[1];
+    orders = results[2];
+    alertsResult = results[3];
+    lastWeekSameHourCount = results[4];
+    activeOrders = results[5];
+    occupiedTables = results[6];
+    stockResult = results[7];
+    recentOrdersResult = results[8];
+  } catch (err) {
+    if (!useMock && process.env.NODE_ENV === "production") throw err;
+    console.warn("dashboard: queries failed, using mock data", err);
+  }
 
-  const useMock = req.nextUrl.searchParams.get("mock") === "true" || process.env.DASHBOARD_USE_MOCK_DATA !== "false";
   const isDevMock = useMock || (ordersToday === 0 && process.env.NODE_ENV !== "production");
 
   /* ---------- Real DB calculations ---------- */
@@ -133,7 +148,7 @@ export async function GET(req: NextRequest) {
   }[];
   const multiBranch = !locationId && new Set(stockRows.map((s) => s.location?.name)).size > 1;
   const allLowStock = stockRows
-    .filter((s) => s.quantity <= s.ingredient.threshold)
+    .filter((s) => s.ingredient && s.quantity <= s.ingredient.threshold)
     .map((s) => ({
       id: s.id,
       name: s.ingredient.name,

@@ -28,7 +28,7 @@ export function TodaysHighlights({
               Peak Period
             </span>
           </div>
-          <div className="text-xs sm:text-sm font-black text-black tracking-tight truncate">
+          <div className="text-xs sm:text-sm font-black text-text-primary tracking-tight truncate">
             {peakPeriod}
           </div>
         </div>

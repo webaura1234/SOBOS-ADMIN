@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, sbError } from "@/lib/db";
 
 export async function GET(req: NextRequest) {
+  try {
   const locationId = req.nextUrl.searchParams.get("locationId");
   const sb = db();
 
@@ -58,8 +59,8 @@ export async function GET(req: NextRequest) {
     })(),
   ]);
 
-  const stockRows = stockResult as { id: string; quantity: number; ingredient: { name: string; threshold: number } }[];
-  const lowStock = stockRows.filter((s) => s.quantity <= s.ingredient.threshold);
+  const stockRows = stockResult as { id: string; quantity: number; ingredient: { name: string; threshold: number } | null }[];
+  const lowStock = stockRows.filter((s) => s.ingredient && s.quantity <= s.ingredient.threshold);
   const revenueToday = revenueRows.reduce((sum: number, o: { total: number }) => sum + Number(o.total), 0);
 
   return NextResponse.json({
@@ -71,10 +72,23 @@ export async function GET(req: NextRequest) {
     lowStockCount: lowStock.length,
     lowStock: lowStock.slice(0, 5).map((s) => ({
       id: s.id,
-      name: s.ingredient.name,
+      name: s.ingredient!.name,
       quantity: s.quantity,
-      threshold: s.ingredient.threshold,
+      threshold: s.ingredient!.threshold,
     })),
     revenueToday,
   });
+  } catch (err) {
+    console.warn("ops-summary: queries failed", err);
+    return NextResponse.json({
+      pendingOrders: 0,
+      preparingOrders: 0,
+      readyOrders: 0,
+      activeOrders: 0,
+      occupiedTables: 0,
+      lowStockCount: 0,
+      lowStock: [],
+      revenueToday: 0,
+    });
+  }
 }

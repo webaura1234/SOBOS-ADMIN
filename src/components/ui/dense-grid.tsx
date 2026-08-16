@@ -200,14 +200,14 @@ export function DenseGrid<T extends { id: string }>({
                   key={col.key}
                   role="gridcell"
                   className={cn(
-                    "grid-cell whitespace-nowrap font-semibold text-black",
+                    "grid-cell whitespace-nowrap font-semibold text-text-primary",
                     col.align === "right" && "text-right tabular-nums",
                     (col.key === "name" || col.key === "label") && "font-bold",
                     col.key === "_action" && "text-right"
                   )}
                 >
                   {col.key === "_action" ? (
-                    <span className="inline-flex items-center justify-end gap-1 text-base font-bold text-muted opacity-70 group-hover:opacity-100 group-hover:text-black transition-all">
+                    <span className="inline-flex items-center justify-end gap-1 text-base font-bold text-text-muted opacity-70 group-hover:opacity-100 group-hover:text-text-primary transition-all">
                       View →
                     </span>
                   ) : col.render ? (

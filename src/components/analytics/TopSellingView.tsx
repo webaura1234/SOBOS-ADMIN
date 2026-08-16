@@ -6,6 +6,7 @@ import { MenuItem } from "./ProfitMarginView";
 import { InsightCard } from "./InsightCard";
 import { DenseGrid, type Column } from "@/components/ui/dense-grid";
 import { Award, Flame, TrendingUp } from "lucide-react";
+import { ChartContainer } from "@/components/ui/chart-container";
 import {
   BarChart,
   Bar,
@@ -13,7 +14,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   Cell,
 } from "recharts";
 
@@ -240,9 +240,8 @@ export function TopSellingView({ items, loading = false }: TopSellingViewProps) 
             </p>
           </div>
 
-          <div className="h-[280px] w-full pt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
+          <ChartContainer height={280} className="pt-2">
+            <BarChart
                 data={rankingChartData}
                 layout="vertical"
                 margin={{ left: 10, right: 25, top: 0, bottom: 0 }}
@@ -265,8 +264,7 @@ export function TopSellingView({ items, loading = false }: TopSellingViewProps) 
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
-          </div>
+          </ChartContainer>
         </div>
 
         {/* Secondary visualization: Revenue Contribution Share (5 cols) */}

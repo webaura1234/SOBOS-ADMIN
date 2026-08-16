@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, useToast } from "@/lib/toast";
 import { useApp } from "@/lib/context";
+import { cn } from "@/lib/utils";
 import { exportCsv } from "@/components/ui/forms";
 import { AnalyticsHeader } from "@/components/analytics/AnalyticsHeader";
 import { AnalyticsTabs } from "@/components/analytics/AnalyticsTabs";
@@ -87,34 +88,17 @@ const MOCK_REVIEWS: ReviewsData = {
 };
 
 const MOCK_HOURLY_DISTRIBUTION: Record<number, Record<number, number>> = {
-  // 0: Sunday
   0: { 10: 0, 11: 1, 12: 2, 13: 1, 14: 1, 15: 0, 16: 1, 17: 2, 18: 3, 19: 4, 20: 3, 21: 2, 22: 1, 23: 0 },
-  // 1: Monday
   1: { 10: 1, 11: 2, 12: 3, 13: 2, 14: 1, 15: 1, 16: 1, 17: 2, 18: 3, 19: 4, 20: 5, 21: 3, 22: 2, 23: 1 },
-  // 2: Tuesday
   2: { 10: 0, 11: 1, 12: 2, 13: 2, 14: 1, 15: 1, 16: 2, 17: 2, 18: 4, 19: 5, 20: 4, 21: 3, 22: 2, 23: 1 },
-  // 3: Wednesday
   3: { 10: 1, 11: 1, 12: 3, 13: 2, 14: 1, 15: 0, 16: 1, 17: 3, 18: 4, 19: 5, 20: 4, 21: 3, 22: 1, 23: 0 },
-  // 4: Thursday
   4: { 10: 1, 11: 2, 12: 3, 13: 2, 14: 1, 15: 1, 16: 2, 17: 3, 18: 5, 19: 6, 20: 5, 21: 4, 22: 2, 23: 1 },
-  // 5: Friday
   5: { 10: 1, 11: 2, 12: 4, 13: 3, 14: 2, 15: 1, 16: 2, 17: 4, 18: 6, 19: 8, 20: 7, 21: 5, 22: 3, 23: 2 },
-  // 6: Saturday
   6: { 10: 2, 11: 5, 12: 8, 13: 6, 14: 3, 15: 2, 16: 3, 17: 5, 18: 8, 19: 10, 20: 9, 21: 7, 22: 4, 23: 2 },
 };
 
 function getMockRevenue(count: number): number {
   if (count === 0) return 0;
-  if (count === 10) return 8420;
-  if (count === 9) return 7560;
-  if (count === 8) return 6720;
-  if (count === 7) return 5880;
-  if (count === 6) return 5040;
-  if (count === 5) return 4180;
-  if (count === 4) return 3360;
-  if (count === 3) return 2520;
-  if (count === 2) return 1680;
-  if (count === 1) return 840;
   return count * 840;
 }
 
@@ -138,6 +122,8 @@ export default function AnalyticsPage() {
 
   const [rangePreset, setRangePreset] = useState("month");
   const [compareMode, setCompareMode] = useState("none");
+  const [customFrom, setCustomFrom] = useState(() => new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
 
   // State objects
   const [marginData, setMarginData] = useState<MenuItem[]>([]);
@@ -151,25 +137,111 @@ export default function AnalyticsPage() {
   const [reviewsData, setReviewsData] = useState<ReviewsData | null>(null);
 
   // Compute ISO date range
+  // Compute local ISO date range
   const dateRange = useMemo(() => {
+    const formatLocalISO = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
+
+    if (rangePreset === "custom") {
+      const start = customFrom ? new Date(customFrom) : new Date();
+      const end = customTo ? new Date(customTo) : new Date();
+      return {
+        from: customFrom,
+        to: customTo,
+        display: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+      };
+    }
+
     const end = new Date();
     const start = new Date();
     if (rangePreset === "today") start.setHours(0, 0, 0, 0);
     else if (rangePreset === "week") start.setDate(start.getDate() - 7);
-    else if (rangePreset === "month") start.setMonth(start.getMonth() - 1);
-    else if (rangePreset === "quarter") start.setMonth(start.getMonth() - 3);
+    else if (rangePreset === "month") start.setDate(start.getDate() - 30);
+    else if (rangePreset === "quarter") start.setDate(start.getDate() - 90);
+
+    const fromStr = formatLocalISO(start);
+    const toStr = formatLocalISO(end);
 
     return {
-      from: start.toISOString().slice(0, 10),
-      to: end.toISOString().slice(0, 10),
-      display: `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+      from: fromStr,
+      to: toStr,
+      display:
+        rangePreset === "today"
+          ? start.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+          : `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
     };
-  }, [rangePreset]);
+  }, [rangePreset, customFrom, customTo]);
+
+  // Compute time span multiplier for demo / fallback scaling
+  const rangeMultiplier = useMemo(() => {
+    if (rangePreset === "today") return 1 / 30;
+    if (rangePreset === "week") return 7 / 30;
+    if (rangePreset === "month") return 1.0;
+    if (rangePreset === "quarter") return 3.0;
+    if (rangePreset === "custom") {
+      const start = customFrom ? new Date(customFrom) : new Date();
+      const end = customTo ? new Date(customTo) : new Date();
+      const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
+      return days / 30;
+    }
+    return 1.0;
+  }, [rangePreset, customFrom, customTo]);
 
   // Load analytics data
   const loadAnalytics = async () => {
     setLoading(true);
     setErrorState(null);
+
+    const getScaledMockItems = () =>
+      MOCK_ITEMS.map((item) => ({
+        ...item,
+        unitsSold: Math.max(1, Math.round(item.unitsSold * rangeMultiplier)),
+      }));
+
+    const getScaledMockPayments = (): PaymentRow[] =>
+      MOCK_PAYMENTS.map((row) => ({
+        source: row.source,
+        _count: Math.max(1, Math.round(row._count * rangeMultiplier)),
+        _sum: { total: Math.max(100, Math.round((row._sum?.total ?? 0) * rangeMultiplier)) },
+      }));
+
+    const getScaledMockBehavior = (): CustomerBehaviorData => ({
+      ...MOCK_BEHAVIOR,
+      unique: Math.max(1, Math.round(MOCK_BEHAVIOR.unique * rangeMultiplier)),
+      topCustomers: MOCK_BEHAVIOR.topCustomers.map((c) => ({
+        ...c,
+        totalSpend: Math.round(c.totalSpend * rangeMultiplier),
+        visitCount: Math.max(1, Math.round(c.visitCount * rangeMultiplier)),
+      })),
+    });
+
+    const getScaledMockHeatmap = (): HeatCell[][] =>
+      generateMockHeatmap().map((row) =>
+        row.map((cell) => ({
+          count: Math.round(cell.count * rangeMultiplier),
+          revenue: Math.round(cell.revenue * rangeMultiplier),
+        }))
+      );
+
+    const getScaledMockWaste = (): WasteRow[] =>
+      MOCK_WASTE.map((w) => ({
+        ...w,
+        quantity: Math.max(1, Math.round(w.quantity * rangeMultiplier)),
+        estCost: Math.round(w.estCost * rangeMultiplier),
+      }));
+
+    const getScaledMockReviews = (): ReviewsData => ({
+      ...MOCK_REVIEWS,
+      total: Math.max(1, Math.round(MOCK_REVIEWS.total * rangeMultiplier)),
+      distribution: MOCK_REVIEWS.distribution.map((d) => ({
+        ...d,
+        count: Math.max(0, Math.round(d.count * rangeMultiplier)),
+      })),
+    });
 
     try {
       const params = new URLSearchParams({
@@ -182,27 +254,32 @@ export default function AnalyticsPage() {
 
       const data = await apiFetch<Record<string, unknown>>(`/api/analytics?${params}`);
 
+      if (data.comparison) {
+        setComparison(data.comparison as ComparisonData);
+      } else {
+        setComparison(null);
+      }
+
       if (tab === "margin") {
         const items = (data.items as MenuItem[]) ?? [];
-        setMarginData(items.length > 0 ? items : MOCK_ITEMS);
+        setMarginData(items.length > 0 ? items : getScaledMockItems());
       }
       if (tab === "top-selling") {
         const items = (data.items as MenuItem[]) ?? [];
-        setTopSellingData(items.length > 0 ? items : MOCK_ITEMS);
+        setTopSellingData(items.length > 0 ? items : getScaledMockItems());
       }
       if (tab === "payments") {
         const bd = (data.paymentBreakdown as PaymentRow[]) ?? [];
-        setPaymentData(bd.length > 0 ? bd : MOCK_PAYMENTS);
-        setComparison((data.comparison as ComparisonData) ?? null);
+        setPaymentData(bd.length > 0 ? bd : getScaledMockPayments());
       }
       if (tab === "customer-behavior") {
         const beh = (data.behavior as CustomerBehaviorData) ?? null;
-        setBehaviorData(beh && beh.unique > 0 ? beh : MOCK_BEHAVIOR);
+        setBehaviorData(beh && beh.unique > 0 ? beh : getScaledMockBehavior());
       }
       if (tab === "heatmap") {
-        const hm = (data.heatmap as HeatCell[][]) ?? [];
+        const hm = ((data.heatmap ?? data.heatmapMatrix) as HeatCell[][]) ?? [];
         const hasData = hm.some((row) => row.some((cell) => cell.count > 0));
-        setHeatmapData(hasData ? hm : generateMockHeatmap());
+        setHeatmapData(hasData ? hm : getScaledMockHeatmap());
       }
       if (tab === "inventory-trend") {
         const tr = (data.trend as TrendRow[]) ?? [];
@@ -213,25 +290,24 @@ export default function AnalyticsPage() {
         if (rows.length > 0) {
           setWasteData(rows.map((w, i) => ({ ...w, id: String(i) })));
         } else {
-          setWasteData(MOCK_WASTE);
+          setWasteData(getScaledMockWaste());
         }
       }
       if (tab === "reviews") {
         const rev = (data.reviews as ReviewsData) ?? null;
-        setReviewsData(rev && rev.total > 0 ? rev : MOCK_REVIEWS);
+        setReviewsData(rev && rev.total > 0 ? rev : getScaledMockReviews());
       }
     } catch (e: any) {
-      // Set contextual fallback mock data if backend fetch fails
-      if (tab === "margin") setMarginData(MOCK_ITEMS);
-      if (tab === "top-selling") setTopSellingData(MOCK_ITEMS);
-      if (tab === "payments") setPaymentData(MOCK_PAYMENTS);
-      if (tab === "customer-behavior") setBehaviorData(MOCK_BEHAVIOR);
-      if (tab === "heatmap") setHeatmapData(generateMockHeatmap());
+      if (tab === "margin") setMarginData(getScaledMockItems());
+      if (tab === "top-selling") setTopSellingData(getScaledMockItems());
+      if (tab === "payments") setPaymentData(getScaledMockPayments());
+      if (tab === "customer-behavior") setBehaviorData(getScaledMockBehavior());
+      if (tab === "heatmap") setHeatmapData(getScaledMockHeatmap());
       if (tab === "inventory-trend") setTrendData(MOCK_TREND);
-      if (tab === "waste") setWasteData(MOCK_WASTE);
-      if (tab === "reviews") setReviewsData(MOCK_REVIEWS);
+      if (tab === "waste") setWasteData(getScaledMockWaste());
+      if (tab === "reviews") setReviewsData(getScaledMockReviews());
 
-      console.warn("Analytics backend API offline, displaying cached mock workspace data:", e.message);
+      console.warn("Analytics backend API warning:", e.message);
     } finally {
       setLoading(false);
     }
@@ -240,6 +316,12 @@ export default function AnalyticsPage() {
   useEffect(() => {
     loadAnalytics();
   }, [tab, dateRange, compareMode, locationId]);
+
+  const handleCustomDateApply = (from: string, to: string) => {
+    setCustomFrom(from);
+    setCustomTo(to);
+    setRangePreset("custom");
+  };
 
   // Export report handler
   const handleExportReport = () => {
@@ -300,11 +382,63 @@ export default function AnalyticsPage() {
         rangePreset={rangePreset}
         onRangeChange={setRangePreset}
         dateRangeDisplay={dateRange.display}
+        customFrom={customFrom}
+        customTo={customTo}
+        onCustomDateApply={handleCustomDateApply}
         compareMode={compareMode}
         onCompareChange={setCompareMode}
         onPrint={() => window.print()}
         onExport={handleExportReport}
       />
+
+      {/* Comparison Summary Indicator */}
+      {compareMode !== "none" && comparison && (
+        <div className="mb-6 p-4 bg-surface-2 border border-yellow/40 rounded-2xl flex flex-wrap items-center justify-between gap-4 text-xs shadow-xs animate-in fade-in duration-200">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-extrabold text-yellow uppercase tracking-wider text-[11px] bg-yellow/10 px-2.5 py-1 rounded-lg border border-yellow/20">
+              Period Comparison ({compareMode === "prev" ? "vs Previous Period" : "vs Same Period Last Year"})
+            </span>
+            <span className="text-text-muted hidden sm:inline">|</span>
+            <div className="flex items-center gap-2">
+              <span className="text-text-muted font-medium">Revenue:</span>
+              <span className="font-extrabold text-text-primary">
+                ₹{comparison.current.revenue.toLocaleString()}
+              </span>
+              <span className="text-text-muted text-[11px]">
+                (vs ₹{comparison.previous.revenue.toLocaleString()})
+              </span>
+              <span
+                className={cn(
+                  "font-extrabold px-2 py-0.5 rounded-md text-[11px]",
+                  (comparison.diffPercentage?.revenue ?? 0) >= 0
+                    ? "bg-green-surface text-green border border-[var(--border-success)]"
+                    : "bg-red-surface text-red border border-[var(--border-critical)]"
+                )}
+              >
+                {(comparison.diffPercentage?.revenue ?? 0) >= 0 ? "+" : ""}
+                {comparison.diffPercentage?.revenue ?? 0}%
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-text-muted font-medium">Orders:</span>
+            <span className="font-extrabold text-text-primary">{comparison.current.orders}</span>
+            <span className="text-text-muted text-[11px]">(vs {comparison.previous.orders})</span>
+            <span
+              className={cn(
+                "font-extrabold px-2 py-0.5 rounded-md text-[11px]",
+                (comparison.diffPercentage?.orders ?? 0) >= 0
+                  ? "bg-green-surface text-green border border-[var(--border-success)]"
+                  : "bg-red-surface text-red border border-[var(--border-critical)]"
+              )}
+            >
+              {(comparison.diffPercentage?.orders ?? 0) >= 0 ? "+" : ""}
+              {comparison.diffPercentage?.orders ?? 0}%
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Analytics Tab Navigation */}
       <AnalyticsTabs activeTab={tab} onTabChange={setTab} />

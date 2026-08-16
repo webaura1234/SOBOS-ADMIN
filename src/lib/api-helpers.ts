@@ -14,16 +14,21 @@ export async function audit(
   after?: unknown,
   before?: unknown,
 ) {
-  const { error } = await db().from("AuditLog").insert({
-    id: crypto.randomUUID(),
-    actorName: "Rajesh Kumar",
-    action,
-    resourceType,
-    resourceId,
-    beforeJson: before ? JSON.stringify(before) : null,
-    afterJson: after ? JSON.stringify(after) : null,
-  });
-  if (error) sbError(error, "audit");
+  try {
+    const restaurantId = await getRestaurantId().catch(() => null);
+    await db().from("AuditLog").insert({
+      id: crypto.randomUUID(),
+      restaurantId: restaurantId ?? "default",
+      actorName: "Rajesh Kumar",
+      action,
+      resourceType,
+      resourceId,
+      beforeJson: before ? JSON.stringify(before) : null,
+      afterJson: after ? JSON.stringify(after) : null,
+    });
+  } catch (err) {
+    console.warn("Audit log notice:", err);
+  }
 }
 
 export function calcMargin(price: number, cost: number) {
@@ -44,7 +49,7 @@ export async function syncAutoOutOfStock(ingredientId: string) {
 
   const { data: recipeLinks, error: linkErr } = await sb
     .from("RecipeIngredient")
-    .select("recipeId, Recipe(itemId)")
+    .select("recipeId, recipe:Recipe(itemId)")
     .eq("ingredientId", ingredientId);
   if (linkErr) sbError(linkErr, "syncAutoOutOfStock/recipes");
 
@@ -52,7 +57,7 @@ export async function syncAutoOutOfStock(ingredientId: string) {
     ...new Set(
       (recipeLinks ?? [])
         .map((row: any) => {
-          const recipe = row.Recipe as unknown as { itemId: string } | null;
+          const recipe = (row.recipe ?? row.Recipe) as { itemId: string } | null;
           return recipe?.itemId;
         })
         .filter(Boolean) as string[],
@@ -81,7 +86,7 @@ export async function recomputeRecipeCostsForIngredient(ingredientId: string) {
   const sb = db();
   const { data: recipeLinks, error: linkErr } = await sb
     .from("RecipeIngredient")
-    .select("recipeId, Recipe(itemId)")
+    .select("recipeId, recipe:Recipe(itemId)")
     .eq("ingredientId", ingredientId);
   if (linkErr) sbError(linkErr, "recomputeRecipeCosts/links");
 
@@ -89,7 +94,7 @@ export async function recomputeRecipeCostsForIngredient(ingredientId: string) {
     ...new Set(
       (recipeLinks ?? [])
         .map((row: any) => {
-          const recipe = row.Recipe as unknown as { itemId: string } | null;
+          const recipe = (row.recipe ?? row.Recipe) as { itemId: string } | null;
           return recipe?.itemId;
         })
         .filter(Boolean) as string[],
@@ -99,20 +104,23 @@ export async function recomputeRecipeCostsForIngredient(ingredientId: string) {
   for (const itemId of itemIds) {
     const { data: item, error: itemErr } = await sb
       .from("MenuItem")
-      .select("id, basePrice, Recipe(id, RecipeIngredient(quantity, Ingredient(lastUnitPrice)))")
+      .select("id, basePrice, recipe:Recipe(id, ingredients:RecipeIngredient(quantity, ingredient:Ingredient(lastUnitPrice)))")
       .eq("id", itemId)
       .maybeSingle();
     if (itemErr) sbError(itemErr, "recomputeRecipeCosts/item");
     if (!item) continue;
-    const recipeData = item.Recipe as unknown as
+    const recipeData = (item.recipe ?? item.Recipe) as
       | {
-          RecipeIngredient: { quantity: number; Ingredient: { lastUnitPrice: number } | null }[];
+          ingredients?: { quantity: number; ingredient: { lastUnitPrice: number } | null }[];
+          RecipeIngredient?: { quantity: number; Ingredient: { lastUnitPrice: number } | null }[];
         }
       | null;
     if (!recipeData) continue;
 
-    const cost = (recipeData.RecipeIngredient ?? []).reduce(
-      (sum, line) => sum + line.quantity * (line.Ingredient?.lastUnitPrice ?? 0),
+    const lines = recipeData.ingredients ?? recipeData.RecipeIngredient ?? [];
+    const cost = lines.reduce(
+      (sum, line: any) =>
+        sum + Number(line.quantity) * Number((line.ingredient ?? line.Ingredient)?.lastUnitPrice ?? 0),
       0,
     );
     const { error } = await sb

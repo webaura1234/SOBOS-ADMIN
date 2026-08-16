@@ -38,7 +38,7 @@ export function ChartContainer({ className, height = 192, children }: ChartConta
       style={{ height, minHeight: height }}
     >
       {ready ? (
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={height}>
           {children}
         </ResponsiveContainer>
       ) : null}

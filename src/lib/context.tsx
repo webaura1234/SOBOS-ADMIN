@@ -78,9 +78,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       if (e.key === "/" && !(e.target instanceof HTMLInputElement) && !(e.target instanceof HTMLTextAreaElement)) {
         e.preventDefault();
-        const pageSearch = document.getElementById("global-search");
-        if (pageSearch) pageSearch.focus();
-        else setGlobalSearchOpen(true);
+        setGlobalSearchOpen(true);
       }
       if (e.key === "Escape") {
         setGlobalSearchOpen(false);

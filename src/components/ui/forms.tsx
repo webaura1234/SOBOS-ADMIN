@@ -43,7 +43,7 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={ref}
-      className="fixed inset-0 z-[150] m-auto max-w-md w-full bg-surface-1 border border-border rounded-2xl p-0 backdrop:bg-[var(--scrim)] text-text-primary shadow-2xl"
+      className="fixed inset-0 z-[150] m-auto max-w-md w-full bg-surface-1 border border-border rounded-2xl p-0 outline-none backdrop:bg-[var(--scrim)] text-text-primary shadow-2xl"
       onClose={onCancel}
     >
       <div className="p-6">

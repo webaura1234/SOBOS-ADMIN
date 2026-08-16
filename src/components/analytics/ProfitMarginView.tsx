@@ -5,6 +5,7 @@ import { formatCurrency, cn } from "@/lib/utils";
 import { InsightCard } from "./InsightCard";
 import { FilterBar } from "@/components/ui/shared";
 import { DenseGrid, type Column } from "@/components/ui/dense-grid";
+import { ChartContainer } from "@/components/ui/chart-container";
 import {
   ScatterChart,
   Scatter,
@@ -12,7 +13,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   Cell,
   ReferenceLine,
 } from "recharts";
@@ -73,7 +73,7 @@ function MatrixTooltip({ active, payload }: MatrixTooltipProps) {
       </div>
       <div className="flex justify-between gap-4">
         <span className="text-text-muted font-semibold">Sales Volume:</span>
-        <span className="font-bold tabular-nums text-text-primary">{data.x} units</span>
+        <span className="font-bold tabular-nums text-text-primary">{(data as any).displayUnits ?? data.x} units</span>
       </div>
       <div className="flex justify-between gap-4">
         <span className="text-text-muted font-semibold">Profit / Unit:</span>
@@ -120,18 +120,21 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
     return [...items].sort((a, b) => b.grossMargin - a.grossMargin).slice(0, 7);
   }, [items]);
 
+  const maxUnits = useMemo(() => Math.max(0, ...items.map((i) => i.unitsSold)), [items]);
+
   // Average units for quadrant splitting
   const avgUnits = useMemo(() => {
-    if (items.length === 0) return 200;
-    return Math.round(items.reduce((s, i) => s + i.unitsSold, 0) / items.length);
-  }, [items]);
+    if (items.length === 0) return 50;
+    const mean = Math.round(items.reduce((s, i) => s + i.unitsSold, 0) / items.length);
+    return maxUnits > 0 ? Math.max(1, mean) : 50;
+  }, [items, maxUnits]);
 
   // Matrix Scatter Data: Units Sold (X) vs Gross Margin (Y)
   const matrixData = useMemo(() => {
     if (items.length === 0) return [];
     const avgMargin = 60; // Standard 60% margin threshold or avg
 
-    return items.map((item) => {
+    return items.map((item, idx) => {
       let quadKey = "other";
       let quadName = "Low Performer";
 
@@ -149,8 +152,11 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
         quadName = "Low Performer";
       }
 
+      const xVal = maxUnits > 0 ? item.unitsSold : Math.round(((idx + 1) / (items.length + 1)) * 100);
+
       return {
-        x: item.unitsSold,
+        x: xVal,
+        displayUnits: item.unitsSold,
         y: Math.round(item.grossMargin * 10) / 10,
         z: item.basePrice,
         name: item.name,
@@ -159,7 +165,7 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
         profitPerUnit: item.basePrice - item.recipeCost,
       };
     });
-  }, [items, avgUnits]);
+  }, [items, avgUnits, maxUnits]);
 
   const cols: Column<MenuItem>[] = [
     {
@@ -370,14 +376,13 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
               Review Pricing ⚠️
             </div>
 
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={290}>
+            <ChartContainer height={290}>
               <ScatterChart margin={{ top: 25, right: 25, bottom: 25, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" opacity={0.8} />
                 <XAxis
                   type="number"
                   dataKey="x"
                   name="Sales Volume"
-                  unit=" units"
                   tick={{ fontSize: 10, fill: "#B8AA96", fontWeight: 600 }}
                   tickFormatter={(val) => `${val} units`}
                 />
@@ -385,7 +390,6 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
                   type="number"
                   dataKey="y"
                   name="Gross Margin"
-                  unit="%"
                   domain={[0, 100]}
                   ticks={[0, 25, 50, 75, 100]}
                   tick={{ fontSize: 10, fill: "#B8AA96", fontWeight: 600 }}
@@ -443,7 +447,7 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
                   })}
                 </Scatter>
               </ScatterChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         </div>
       </div>
