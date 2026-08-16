@@ -1,4 +1,11 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../generated/prisma/client";
+
+const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
+
+if (!connectionString) {
+  throw new Error("Missing DATABASE_URL or DIRECT_URL");
+}
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -7,11 +14,7 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL || process.env.DIRECT_URL,
-      },
-    },
+    adapter: new PrismaPg(connectionString),
     log: ["error"],
   });
 

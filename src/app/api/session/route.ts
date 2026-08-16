@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type SessionUser = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string;
+  restaurant: { id: string; name: string };
+  locationRoles: Array<{
+    location: { id: string; name: string } | null;
+    role: {
+      name: string | null;
+      permissions: Array<{
+        permission: { resource: string; action: string };
+      }>;
+    } | null;
+  }>;
+};
+
 export async function GET(req: NextRequest) {
   try {
     const requestedRole = req.cookies.get("sobosRole")?.value ?? req.nextUrl.searchParams.get("role")?.toLowerCase();
     const roleName = requestedRole === "manager" ? "Manager" : "Owner";
 
-    const users = await prisma.user.findMany({
+    const users = (await prisma.user.findMany({
       where: { status: "active" },
       include: {
         restaurant: { select: { id: true, name: true } },
@@ -25,7 +42,7 @@ export async function GET(req: NextRequest) {
           },
         },
       },
-    });
+    })) as SessionUser[];
 
     let user = users.find((u) =>
       u.locationRoles?.some((lr) => lr.role?.name === roleName),
@@ -59,7 +76,7 @@ export async function GET(req: NextRequest) {
       restaurant: user.restaurant,
       permissions,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("session/GET error:", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
