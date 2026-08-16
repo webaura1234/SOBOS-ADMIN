@@ -78,12 +78,12 @@ export default function PaymentsPage() {
       <TabBar tabs={[{ id: "methods", label: "Methods" }, { id: "gateway", label: "Gateway" }, { id: "tips", label: "Tips" }, { id: "commissions", label: "Commissions" }, { id: "settlements", label: "Settlements" }, { id: "cash", label: "Cash Drawer" }, { id: "refunds", label: "Refunds" }]} active={tab} onChange={setTab} />
 
       {tab === "methods" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4 text-text-primary shadow-2xs">
           {([["cashEnabled", "Cash"], ["cardEnabled", "Card"], ["upiEnabled", "UPI"], ["walletEnabled", "Wallet"]] as const).map(([key, label]) => (
-            <label key={key} className="flex justify-between font-bold text-black"><span>{label}{(key === "cardEnabled" || key === "upiEnabled" || key === "walletEnabled") && !config.razorpayKey && <span className="text-xs text-muted font-medium ml-2">needs Razorpay</span>}</span><input type="checkbox" checked={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label key={key} className="flex justify-between font-bold text-text-primary"><span>{label}{(key === "cardEnabled" || key === "upiEnabled" || key === "walletEnabled") && !config.razorpayKey && <span className="text-xs text-text-muted font-medium ml-2">needs Razorpay</span>}</span><input type="checkbox" checked={config[key]} onChange={(e) => setConfig({ ...config, [key]: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           ))}
           <div className="pt-2 border-t border-border space-y-3">
-            <label className="flex justify-between font-bold"><span>Split payment</span><input type="checkbox" checked={config.splitEnabled} onChange={(e) => setConfig({ ...config, splitEnabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label className="flex justify-between font-bold text-text-primary"><span>Split payment</span><input type="checkbox" checked={config.splitEnabled} onChange={(e) => setConfig({ ...config, splitEnabled: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
             <FormField label="Max splits (0 = unlimited)"><input type="number" className={inputClass} value={config.splitMax} onChange={(e) => setConfig({ ...config, splitMax: Number(e.target.value) })} /></FormField>
           </div>
           <BtnPrimary onClick={saveConfig}><Save size={18} /> Save</BtnPrimary>
@@ -91,8 +91,8 @@ export default function PaymentsPage() {
       )}
 
       {tab === "gateway" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-1">
-          <label className="flex justify-between font-bold mb-3"><span>Test mode</span><input type="checkbox" checked={config.testMode} onChange={(e) => setConfig({ ...config, testMode: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-1 text-text-primary shadow-2xs">
+          <label className="flex justify-between font-bold mb-3 text-text-primary"><span>Test mode</span><input type="checkbox" checked={config.testMode} onChange={(e) => setConfig({ ...config, testMode: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           <FormField label="Razorpay Key ID"><input className={inputClass} value={config.razorpayKey ?? ""} onChange={(e) => setConfig({ ...config, razorpayKey: e.target.value })} /></FormField>
           <FormField label="Razorpay Secret" hint="Stored encrypted; shown masked"><input type="password" className={inputClass} value={config.razorpaySecret ?? ""} onChange={(e) => setConfig({ ...config, razorpaySecret: e.target.value })} placeholder="••••••••" /></FormField>
           <FormField label="Webhook endpoint" hint="Auto-generated; point Razorpay here"><input className={inputClass} value={config.webhookUrl ?? `${typeof window !== "undefined" ? window.location.origin : ""}/api/webhooks/razorpay`} onChange={(e) => setConfig({ ...config, webhookUrl: e.target.value })} /></FormField>
@@ -101,8 +101,8 @@ export default function PaymentsPage() {
       )}
 
       {tab === "tips" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          <label className="flex justify-between font-bold"><span>Enable tips</span><input type="checkbox" checked={config.tipsEnabled} onChange={(e) => setConfig({ ...config, tipsEnabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4 text-text-primary shadow-2xs">
+          <label className="flex justify-between font-bold text-text-primary"><span>Enable tips</span><input type="checkbox" checked={config.tipsEnabled} onChange={(e) => setConfig({ ...config, tipsEnabled: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           <FormField label="Tip type"><select className={selectClass} value={config.tipType} onChange={(e) => setConfig({ ...config, tipType: e.target.value })}><option value="percentage">Percentage</option><option value="fixed">Fixed amount</option></select></FormField>
           <FormField label="Pooling rule"><select className={selectClass} value={config.tipPooling} onChange={(e) => setConfig({ ...config, tipPooling: e.target.value })}><option value="per_server">Per server</option><option value="equal">Equal split</option><option value="percentage">Percentage ratio</option></select></FormField>
           <BtnPrimary onClick={saveConfig}><Save size={18} /> Save</BtnPrimary>
@@ -110,8 +110,8 @@ export default function PaymentsPage() {
       )}
 
       {tab === "commissions" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          <p className="text-sm text-muted font-medium">Rate changes apply to new orders only.</p>
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4 text-text-primary shadow-2xs">
+          <p className="text-sm text-text-muted font-medium">Rate changes apply to new orders only.</p>
           {([["swiggyRate", "Swiggy"], ["zomatoRate", "Zomato"], ["ondcRate", "ONDC"]] as const).map(([key, label]) => (
             <FormField key={key} label={`${label} Rate (%)`}><input type="number" className={inputClass} value={config[key]} onChange={(e) => setConfig({ ...config, [key]: Number(e.target.value) })} /></FormField>
           ))}

@@ -90,12 +90,12 @@ export default function SetupPage() {
     <div>
       <PageHeader title="Setup / Onboarding" subtitle="Guided wizard — finish required steps, import data, then go live" />
 
-      <div className="bg-white border-2 border-border rounded-2xl p-5 mb-5">
+      <div className="bg-surface-1 border border-border rounded-2xl p-5 mb-5 shadow-2xs">
         <div className="flex items-center justify-between gap-4 mb-3">
-          <div><h2 className="text-xl font-bold">Launch Checklist</h2><p className="text-sm font-semibold text-muted">{doneCount} of {STEPS.length} steps · {status?.locationCount ?? 0} location(s) · {tableCount} table(s){status && status.liveLocations > 0 ? ` · ${status.liveLocations} live` : ""}</p></div>
-          <span className="text-3xl font-bold">{Math.round((doneCount / STEPS.length) * 100)}%</span>
+          <div><h2 className="text-xl font-bold text-text-primary">Launch Checklist</h2><p className="text-sm font-semibold text-text-muted">{doneCount} of {STEPS.length} steps · {status?.locationCount ?? 0} location(s) · {tableCount} table(s){status && status.liveLocations > 0 ? ` · ${status.liveLocations} live` : ""}</p></div>
+          <span className="text-3xl font-extrabold text-text-primary tabular-nums">{Math.round((doneCount / STEPS.length) * 100)}%</span>
         </div>
-        <div className="h-4 rounded-full bg-cream border-2 border-border overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: `${(doneCount / STEPS.length) * 100}%` }} /></div>
+        <div className="h-4 rounded-full bg-surface-2 border border-border overflow-hidden"><div className="h-full bg-yellow transition-all" style={{ width: `${(doneCount / STEPS.length) * 100}%` }} /></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
@@ -104,9 +104,9 @@ export default function SetupPage() {
           {STEPS.map((s, i) => {
             const Icon = s.icon; const done = completed[s.key];
             return (
-              <button key={s.key} type="button" onClick={() => setActiveStep(s.key)} className={cn("w-full text-left p-3 rounded-xl border-2 flex items-center gap-3 focus-ring", activeStep === s.key ? "border-primary bg-primary/10" : "border-border bg-white hover:bg-cream")}>
-                <span className={cn("w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0", done ? "bg-primary border-primary" : "bg-cream border-border")}>{done ? <Check size={16} strokeWidth={3} /> : <span className="font-bold text-sm">{i + 1}</span>}</span>
-                <span className="min-w-0"><span className="flex items-center gap-1.5 font-bold text-sm"><Icon size={14} />{s.title}</span><span className="block text-xs text-muted truncate">{s.desc}</span></span>
+              <button key={s.key} type="button" onClick={() => setActiveStep(s.key)} className={cn("w-full text-left p-3 rounded-xl border flex items-center gap-3 focus-ring transition-colors", activeStep === s.key ? "border-yellow bg-yellow-surface text-text-primary" : "border-border bg-surface-1 hover:bg-surface-2 text-text-primary")}>
+                <span className={cn("w-8 h-8 rounded-full border flex items-center justify-center shrink-0 font-bold", done ? "bg-yellow border-yellow text-[var(--on-yellow)]" : "bg-surface-2 border-border text-text-secondary")}>{done ? <Check size={16} strokeWidth={3} /> : <span className="font-bold text-xs">{i + 1}</span>}</span>
+                <span className="min-w-0"><span className="flex items-center gap-1.5 font-bold text-sm text-text-primary"><Icon size={14} className="text-yellow" />{s.title}</span><span className="block text-xs text-text-muted truncate">{s.desc}</span></span>
               </button>
             );
           })}
@@ -114,32 +114,32 @@ export default function SetupPage() {
 
         {/* Step panel */}
         <div className="page-surface p-5">
-          <div className="flex items-center gap-2 mb-2 flex-wrap"><step.icon size={20} /><h2 className="text-xl font-bold">{step.title}</h2>{step.required && <span className="text-xs px-2 py-0.5 rounded bg-cream border border-border font-bold">required</span>}{auto[activeStep] ? <span className="text-xs px-2 py-0.5 rounded bg-green-100 border border-green-300 text-green-800 font-bold inline-flex items-center gap-1"><Check size={12} strokeWidth={3} /> Detected from your data</span> : <span className="text-xs px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 font-bold">Not detected yet</span>}</div>
-          <p className="text-muted font-medium mb-4">{step.desc}</p>
+          <div className="flex items-center gap-2 mb-2 flex-wrap"><step.icon size={20} className="text-yellow" /><h2 className="text-xl font-bold text-text-primary">{step.title}</h2>{step.required && <span className="text-xs px-2 py-0.5 rounded bg-surface-2 border border-border text-text-primary font-bold">required</span>}{auto[activeStep] ? <span className="text-xs px-2 py-0.5 rounded bg-green-surface border border-[var(--border-green)] text-green font-bold inline-flex items-center gap-1"><Check size={12} strokeWidth={3} /> Detected from your data</span> : <span className="text-xs px-2 py-0.5 rounded bg-yellow-surface border border-[var(--border-warning)] text-orange font-bold">Not detected yet</span>}</div>
+          <p className="text-text-muted font-medium mb-4">{step.desc}</p>
 
           {activeStep === "migration" ? (
             <div className="space-y-3">
               <FormField label="What to import"><select className={selectClass} value={importEntity} onChange={(e) => { setImportEntity(e.target.value); setImportResult(null); }}>{IMPORT_ENTITIES.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}</select></FormField>
-              <p className="text-sm text-muted font-medium">First line = header row. Columns: <code className="bg-cream px-1 rounded">{entity.cols}</code></p>
+              <p className="text-sm text-text-muted font-medium">First line = header row. Columns: <code className="bg-surface-2 text-yellow px-1.5 py-0.5 rounded border border-border">{entity.cols}</code></p>
               <textarea className={`${inputClass} min-h-40 font-mono text-sm`} value={importText} onChange={(e) => setImportText(e.target.value)} placeholder={`${entity.cols}\n...`} />
               <BtnPrimary onClick={runImport}><Upload size={18} /> Import {entity.label}</BtnPrimary>
               {importResult && (
-                <div className="mt-2"><h3 className="font-bold mb-1">{importResult.created}/{importResult.total} imported</h3>
-                  {importResult.errors.length > 0 && <ul className="space-y-1 text-sm max-h-48 overflow-auto">{importResult.errors.map((e) => <li key={e.row} className="p-2 bg-red-50 rounded-lg flex justify-between"><span>Row {e.row}</span><span className="font-bold text-red-700">{e.error}</span></li>)}</ul>}
+                <div className="mt-2"><h3 className="font-bold mb-1 text-text-primary">{importResult.created}/{importResult.total} imported</h3>
+                  {importResult.errors.length > 0 && <ul className="space-y-1 text-sm max-h-48 overflow-auto">{importResult.errors.map((e) => <li key={e.row} className="p-2 bg-red-surface border border-[var(--border-critical)] rounded-lg flex justify-between"><span>Row {e.row}</span><span className="font-bold text-red">{e.error}</span></li>)}</ul>}
                 </div>
               )}
             </div>
           ) : (
             <div className="space-y-4">
-              <Link href={step.href} className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border-2 border-primary bg-primary/15 font-bold focus-ring">Open {step.title} <ChevronRight size={16} /></Link>
-              {activeStep === "tables" && tableCount === 0 && <p className="text-sm font-bold text-amber-700">At least one table is required before going live — use Bulk Add on the Tables page.</p>}
+              <Link href={step.href} className="inline-flex items-center gap-2 h-11 px-5 rounded-xl border border-yellow bg-yellow-surface font-bold text-yellow hover:bg-yellow/20 focus-ring">Open {step.title} <ChevronRight size={16} /></Link>
+              {activeStep === "tables" && tableCount === 0 && <p className="text-sm font-bold text-orange">At least one table is required before going live — use Bulk Add on the Tables page.</p>}
             </div>
           )}
 
           <div className="flex items-center gap-3 mt-6 pt-4 border-t border-border flex-wrap">
             <BtnSecondary onClick={() => { refreshStatus(); toast("Re-checked admin data"); }}><RotateCw size={16} /> Re-check</BtnSecondary>
             {auto[activeStep] ? (
-              <span className="text-sm font-semibold text-muted">Auto-completed from your admin data — no action needed.</span>
+              <span className="text-sm font-semibold text-text-muted">Auto-completed from your admin data — no action needed.</span>
             ) : (
               <BtnSecondary onClick={() => toggleStep(activeStep)}>{manual[activeStep] ? "Mark incomplete" : "Mark step complete"}</BtnSecondary>
             )}
@@ -147,10 +147,10 @@ export default function SetupPage() {
         </div>
       </div>
 
-      <div className={cn("mt-5 p-5 rounded-2xl border-2 flex flex-wrap items-center justify-between gap-3", requiredDone ? "border-green-300 bg-green-50" : "border-border bg-cream")}>
+      <div className={cn("mt-5 p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 shadow-2xs", requiredDone ? "border-[var(--border-green)] bg-green-surface text-text-primary" : "border-border bg-surface-1 text-text-primary")}>
         <div className="flex items-center gap-3">
-          {requiredDone ? <ShieldCheck size={28} className="text-green-600" /> : <Rocket size={28} className="text-muted" />}
-          <div><div className="font-bold text-lg">{requiredDone ? "Ready to go live" : "Complete required steps to go live"}</div><div className="text-sm text-muted font-medium">Required: profile, location, hours, and ≥1 table.{status && status.pendingLocations > 0 ? ` ${status.pendingLocations} location(s) awaiting activation.` : status && status.liveLocations > 0 && status.pendingLocations === 0 ? " All locations are live." : ""}</div></div>
+          {requiredDone ? <ShieldCheck size={28} className="text-green" /> : <Rocket size={28} className="text-text-muted" />}
+          <div><div className="font-bold text-lg text-text-primary">{requiredDone ? "Ready to go live" : "Complete required steps to go live"}</div><div className="text-sm text-text-muted font-medium">Required: profile, location, hours, and ≥1 table.{status && status.pendingLocations > 0 ? ` ${status.pendingLocations} location(s) awaiting activation.` : status && status.liveLocations > 0 && status.pendingLocations === 0 ? " All locations are live." : ""}</div></div>
         </div>
         <BtnPrimary onClick={goLive} disabled={!requiredDone} className={!requiredDone ? "opacity-50 cursor-not-allowed" : ""}><Rocket size={18} /> Complete Setup & Go Live</BtnPrimary>
       </div>

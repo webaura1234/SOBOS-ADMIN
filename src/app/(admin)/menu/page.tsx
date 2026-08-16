@@ -55,8 +55,8 @@ function MultiToggle({ options, selected, onToggle }: { options: string[]; selec
     <div className="flex flex-wrap gap-2">
       {options.map((o) => (
         <button key={o} type="button" onClick={() => onToggle(o)}
-          className={cn("px-3 py-1.5 rounded-lg text-sm font-bold border-2 focus-ring capitalize",
-            selected.includes(o) ? "bg-primary border-primary text-black" : "border-border bg-white text-muted hover:bg-cream")}>
+          className={cn("px-3 py-1.5 rounded-lg text-sm font-bold border focus-ring capitalize transition-colors",
+            selected.includes(o) ? "bg-yellow border-yellow text-[var(--on-yellow)]" : "border-border bg-surface-2 text-text-muted hover:bg-surface-3 hover:text-text-primary")}>
           {o}
         </button>
       ))}
@@ -153,7 +153,6 @@ function MenuPageContent() {
     if (searchParams.get("action") === "create") openCreate();
     const openId = searchParams.get("open");
     if (openId && items.length > 0) { const item = items.find((i) => i.id === openId); if (item) openEdit(item); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, items.length]);
 
   const saveItem = async () => {
@@ -261,23 +260,23 @@ function MenuPageContent() {
 
   const columns: Column<MenuItem>[] = [
     { key: "name", header: "Name", sortable: true, render: (r) => (
-      <span className="inline-flex items-center gap-2">{r.name}
-        {parseJson(r.dietaryFlags).slice(0, 2).map((d) => <span key={d} className="text-[10px] px-1.5 py-0.5 rounded bg-cream border border-border font-bold capitalize">{d}</span>)}
+      <span className="inline-flex items-center gap-2 text-text-primary">{r.name}
+        {parseJson(r.dietaryFlags).slice(0, 2).map((d) => <span key={d} className="text-[10px] px-1.5 py-0.5 rounded bg-surface-2 border border-border font-bold capitalize text-text-secondary">{d}</span>)}
       </span>
     ) },
     { key: "category", header: "Category", render: (r) => r.category?.name ?? "—" },
     { key: "basePrice", header: "Price", align: "right", sortable: true, render: (r) => (
-      <span>{formatCurrency(r.basePrice)}{r.locationPrice != null && <span className="ml-1 text-[10px] text-amber-700 font-bold" title="Location override">▲{formatCurrency(r.locationPrice)}</span>}</span>
+      <span>{formatCurrency(r.basePrice)}{r.locationPrice != null && <span className="ml-1 text-[10px] text-orange font-bold" title="Location override">▲{formatCurrency(r.locationPrice)}</span>}</span>
     ) },
     { key: "recipeCost", header: "Cost", align: "right", render: (r) => formatCurrency(r.recipeCost) },
     { key: "grossMargin", header: "Margin %", align: "right", sortable: true, render: (r) => {
       const below = r.marginAlertThreshold != null && r.grossMargin < r.marginAlertThreshold;
-      return <span className={cn("tabular-nums", (r.grossMargin < 50 || below) && "text-red-600 font-bold")}>{r.grossMargin.toFixed(1)}%{below && " ⚠"}</span>;
+      return <span className={cn("tabular-nums", (r.grossMargin < 50 || below) && "text-red font-bold")}>{r.grossMargin.toFixed(1)}%{below && " ⚠"}</span>;
     } },
     { key: "availability", header: "Status", render: (r) => (
       <span className="inline-flex items-center gap-1.5">
         <StatusDot status={r.availability} />
-        {r.autoOutOfStock && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">Auto</span>}
+        {r.autoOutOfStock && <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-surface text-red border border-[var(--border-critical)] font-bold">Auto</span>}
       </span>
     ) },
     { key: "unitsSold", header: "Sold", align: "right", sortable: true },
@@ -289,18 +288,18 @@ function MenuPageContent() {
 
   const renderCatRow = (cat: Category, depth: number): React.ReactNode => (
     <div key={cat.id}>
-      <div className="flex items-center justify-between p-3 bg-white border-2 border-border rounded-xl mb-2" style={{ marginLeft: depth * 24 }}>
+      <div className="flex items-center justify-between p-3 bg-surface-1 border border-border rounded-xl mb-2" style={{ marginLeft: depth * 24 }}>
         <div className="flex items-center gap-2 min-w-0">
           {cat.icon && <span>{cat.icon}</span>}
-          <span className="font-bold text-black truncate">{cat.name}</span>
-          {cat.dietaryTag && <span className="text-[10px] px-1.5 py-0.5 rounded bg-cream border border-border font-bold capitalize">{cat.dietaryTag}</span>}
-          <span className="text-xs text-muted font-semibold">{cat._count?.items ?? 0} items</span>
+          <span className="font-bold text-text-primary truncate">{cat.name}</span>
+          {cat.dietaryTag && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-2 border border-border font-bold capitalize text-text-secondary">{cat.dietaryTag}</span>}
+          <span className="text-xs text-text-muted font-semibold">{cat._count?.items ?? 0} items</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button type="button" onClick={() => moveCategory(cat, -1)} className="p-1.5 rounded-lg hover:bg-cream focus-ring" aria-label="Move up"><ChevronUp size={16} /></button>
-          <button type="button" onClick={() => moveCategory(cat, 1)} className="p-1.5 rounded-lg hover:bg-cream focus-ring" aria-label="Move down"><ChevronDown size={16} /></button>
-          <button type="button" onClick={() => setEditingCat({ ...cat })} className="px-2 py-1 text-sm font-bold underline focus-ring">Edit</button>
-          <button type="button" onClick={() => { setCatReassign(cat); setReassignTo(cat.parentId ?? "uncategorized"); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg focus-ring" aria-label="Delete"><Trash2 size={16} /></button>
+          <button type="button" onClick={() => moveCategory(cat, -1)} className="p-1.5 rounded-lg hover:bg-surface-2 text-text-primary focus-ring" aria-label="Move up"><ChevronUp size={16} /></button>
+          <button type="button" onClick={() => moveCategory(cat, 1)} className="p-1.5 rounded-lg hover:bg-surface-2 text-text-primary focus-ring" aria-label="Move down"><ChevronDown size={16} /></button>
+          <button type="button" onClick={() => setEditingCat({ ...cat })} className="px-2 py-1 text-sm font-bold underline focus-ring text-text-primary">Edit</button>
+          <button type="button" onClick={() => { setCatReassign(cat); setReassignTo(cat.parentId ?? "uncategorized"); }} className="p-1.5 text-red hover:bg-red-surface rounded-lg focus-ring" aria-label="Delete"><Trash2 size={16} /></button>
         </div>
       </div>
       {childrenOf(cat.id).map((child) => renderCatRow(child, depth + 1))}
@@ -339,7 +338,7 @@ function MenuPageContent() {
             { label: "Delete", onClick: () => setConfirmDelete([...selected]), destructive: true },
           ]} onClear={() => setSelected(new Set())} />
           <DenseGrid columns={columns} data={sorted} selectedIds={selected}
-            onSelect={(id) => { const n = new Set(selected); n.has(id) ? n.delete(id) : n.add(id); setSelected(n); }}
+            onSelect={(id) => { const n = new Set(selected); if (n.has(id)) { n.delete(id); } else { n.add(id); } setSelected(n); }}
             onSelectAll={() => setSelected(selected.size === items.length ? new Set() : new Set(items.map((i) => i.id)))}
             onRowClick={openEdit} sortKey={sortKey} sortDir={sortDir}
             onSort={(key) => { if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc"); else { setSortKey(key); setSortDir("asc"); } }}
@@ -349,14 +348,14 @@ function MenuPageContent() {
 
       {tab === "categories" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_140px_80px_auto] gap-3 p-4 bg-cream/60 rounded-2xl border border-border items-end">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_140px_80px_auto] gap-3 p-4 bg-surface-1 rounded-2xl border border-border items-end shadow-2xs">
             <FormField label="New category"><input className={inputClass} placeholder="e.g. Starters" value={catDraft.name} onChange={(e) => setCatDraft({ ...catDraft, name: e.target.value })} /></FormField>
             <FormField label="Parent"><select className={selectClass} value={catDraft.parentId} onChange={(e) => setCatDraft({ ...catDraft, parentId: e.target.value })}><option value="">Top level</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></FormField>
             <FormField label="Dietary tag"><input className={inputClass} placeholder="veg" value={catDraft.dietaryTag} onChange={(e) => setCatDraft({ ...catDraft, dietaryTag: e.target.value })} /></FormField>
             <FormField label="Icon"><input className={inputClass} placeholder="🍲" value={catDraft.icon} onChange={(e) => setCatDraft({ ...catDraft, icon: e.target.value })} /></FormField>
             <BtnPrimary onClick={addCategory} className="mb-5"><Plus size={18} /> Add</BtnPrimary>
           </div>
-          <div>{rootCategories.map((c) => renderCatRow(c, 0))}{categories.length === 0 && <p className="text-muted font-semibold text-center py-8">No categories yet</p>}</div>
+          <div>{rootCategories.map((c) => renderCatRow(c, 0))}{categories.length === 0 && <p className="text-text-muted font-semibold text-center py-8">No categories yet</p>}</div>
         </div>
       )}
 
@@ -368,7 +367,7 @@ function MenuPageContent() {
         <div className="space-y-5">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="page-surface p-5 space-y-1">
-              <h3 className="font-bold text-black mb-2">Schedule a seasonal menu</h3>
+              <h3 className="font-bold text-text-primary mb-2">Schedule a seasonal menu</h3>
               <FormField label="Name" required><input className={inputClass} value={seasonalForm.name} onChange={(e) => setSeasonalForm({ ...seasonalForm, name: e.target.value })} placeholder="Summer Specials" /></FormField>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Applies to item"><select className={selectClass} value={seasonalForm.itemId} onChange={(e) => setSeasonalForm({ ...seasonalForm, itemId: e.target.value, categoryId: "" })}><option value="">— any —</option>{items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select></FormField>
@@ -378,15 +377,15 @@ function MenuPageContent() {
                 <FormField label="Start" required><input type="date" className={inputClass} value={seasonalForm.startDate} onChange={(e) => setSeasonalForm({ ...seasonalForm, startDate: e.target.value })} /></FormField>
                 <FormField label="End" required><input type="date" className={inputClass} value={seasonalForm.endDate} onChange={(e) => setSeasonalForm({ ...seasonalForm, endDate: e.target.value })} /></FormField>
               </div>
-              <label className="flex justify-between font-bold mb-4"><span>Recurring annually</span><input type="checkbox" checked={seasonalForm.recurring} onChange={(e) => setSeasonalForm({ ...seasonalForm, recurring: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+              <label className="flex justify-between font-bold mb-4 text-text-primary"><span>Recurring annually</span><input type="checkbox" checked={seasonalForm.recurring} onChange={(e) => setSeasonalForm({ ...seasonalForm, recurring: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
               <BtnPrimary onClick={addSeasonal}><Plus size={18} /> Add Schedule</BtnPrimary>
             </div>
             <div className="page-surface p-5">
-              <h3 className="font-bold text-black mb-2">Menu as of date</h3>
+              <h3 className="font-bold text-text-primary mb-2">Menu as of date</h3>
               <FormField label="Preview date"><input type="date" className={inputClass} value={previewDate} onChange={(e) => setPreviewDate(e.target.value)} /></FormField>
-              {activeOnDate === null ? <p className="text-muted font-medium">Pick a date to preview active seasonal schedules.</p>
-                : activeOnDate.length === 0 ? <p className="text-muted font-medium">No seasonal schedules active on {previewDate}.</p>
-                : <ul className="space-y-2">{activeOnDate.map((s) => <li key={s.id} className="p-3 bg-cream rounded-lg font-semibold">{s.name}</li>)}</ul>}
+              {activeOnDate === null ? <p className="text-text-muted font-medium">Pick a date to preview active seasonal schedules.</p>
+                : activeOnDate.length === 0 ? <p className="text-text-muted font-medium">No seasonal schedules active on {previewDate}.</p>
+                : <ul className="space-y-2">{activeOnDate.map((s) => <li key={s.id} className="p-3 bg-surface-2 border border-border rounded-lg font-semibold text-text-primary">{s.name}</li>)}</ul>}
             </div>
           </div>
           <DenseGrid columns={[
@@ -441,31 +440,31 @@ function MenuPageContent() {
                     <button type="button" onClick={() => setVariants(variants.filter((_, idx) => idx !== i))} className="h-12 rounded-xl border-2 border-border text-red-600 font-bold focus-ring">×</button>
                   </div>
                 ))}
-                {variants.length === 0 && <p className="text-sm font-semibold text-muted bg-cream border-2 border-border rounded-xl p-3">No variants. Default base price applies.</p>}
+                {variants.length === 0 && <p className="text-sm font-semibold text-text-muted bg-surface-2 border border-border rounded-xl p-3">No variants. Default base price applies.</p>}
               </div>
             </section>
             <section>
-              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-black">Modifier Groups</h3>
+              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-text-primary">Modifier Groups</h3>
                 <BtnSecondary onClick={() => setModifierGroups([...modifierGroups, { name: "", required: false, minSelect: 0, maxSelect: 1, options: [] }])}><Plus size={16} /> Add Group</BtnSecondary></div>
               <div className="space-y-3">
                 {modifierGroups.map((g, gi) => (
-                  <div key={gi} className="p-3 border-2 border-border rounded-xl bg-cream/40 space-y-2">
+                  <div key={gi} className="p-3 border border-border rounded-xl bg-surface-2 space-y-2">
                     <div className="grid grid-cols-[1fr_auto_40px] gap-2 items-center">
                       <input className={inputClass} placeholder="Group name (e.g. Spice Level)" value={g.name} onChange={(e) => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, name: e.target.value } : x))} />
-                      <label className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap"><input type="checkbox" checked={g.required} onChange={(e) => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, required: e.target.checked } : x))} className="w-4 h-4 accent-[#F4B315]" /> Required</label>
-                      <button type="button" onClick={() => setModifierGroups(modifierGroups.filter((_, i) => i !== gi))} className="h-12 rounded-xl border-2 border-border text-red-600 font-bold focus-ring">×</button>
+                      <label className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap text-text-primary"><input type="checkbox" checked={g.required} onChange={(e) => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, required: e.target.checked } : x))} className="w-4 h-4 accent-[#FED500]" /> Required</label>
+                      <button type="button" onClick={() => setModifierGroups(modifierGroups.filter((_, i) => i !== gi))} className="h-12 rounded-xl border border-border text-red font-bold focus-ring">×</button>
                     </div>
                     {g.options.map((o, oi) => (
                       <div key={oi} className="grid grid-cols-[1fr_110px_40px] gap-2 items-center pl-4">
                         <input className={inputClass} placeholder="Option (e.g. Extra Hot)" value={o.label} onChange={(e) => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, options: x.options.map((y, j) => j === oi ? { ...y, label: e.target.value } : y) } : x))} />
                         <input type="number" className={inputClass} placeholder="+₹" value={o.priceDelta} onChange={(e) => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, options: x.options.map((y, j) => j === oi ? { ...y, priceDelta: Number(e.target.value) } : y) } : x))} />
-                        <button type="button" onClick={() => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, options: x.options.filter((_, j) => j !== oi) } : x))} className="h-12 rounded-xl border-2 border-border text-red-600 font-bold focus-ring">×</button>
+                        <button type="button" onClick={() => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, options: x.options.filter((_, j) => j !== oi) } : x))} className="h-12 rounded-xl border border-border text-red font-bold focus-ring">×</button>
                       </div>
                     ))}
-                    <button type="button" onClick={() => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, options: [...x.options, { label: "", priceDelta: 0 }] } : x))} className="text-sm font-bold underline pl-4">+ Add option</button>
+                    <button type="button" onClick={() => setModifierGroups(modifierGroups.map((x, i) => i === gi ? { ...x, options: [...x.options, { label: "", priceDelta: 0 }] } : x))} className="text-sm font-bold underline pl-4 text-yellow">+ Add option</button>
                   </div>
                 ))}
-                {modifierGroups.length === 0 && <p className="text-sm font-semibold text-muted bg-cream border-2 border-border rounded-xl p-3">No modifier groups.</p>}
+                {modifierGroups.length === 0 && <p className="text-sm font-semibold text-text-muted bg-surface-2 border border-border rounded-xl p-3">No modifier groups.</p>}
               </div>
             </section>
           </div>
@@ -475,7 +474,7 @@ function MenuPageContent() {
           <div className="space-y-6">
             <section>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-black">Recipe Ingredients {detail?.recipe && <span className="text-xs text-muted">v{detail.recipe.version}</span>}</h3>
+                <h3 className="font-bold text-text-primary">Recipe Ingredients {detail?.recipe && <span className="text-xs text-text-muted">v{detail.recipe.version}</span>}</h3>
                 <div className="flex gap-2">
                   {detail?.recipe?.snapshots && detail.recipe.snapshots.length > 0 && <BtnSecondary onClick={() => setShowVersions((v) => !v)}><History size={16} /> History</BtnSecondary>}
                   <BtnSecondary onClick={addRecipeLine}><Plus size={16} /> Add Ingredient</BtnSecondary>
@@ -487,22 +486,22 @@ function MenuPageContent() {
                     <select className={selectClass} value={line.ingredientId} onChange={(e) => updateRecipeLine(i, { ingredientId: e.target.value })}><option value="">Ingredient</option>{ingredients.map((ing) => <option key={ing.id} value={ing.id}>{ing.name}</option>)}</select>
                     <input type="number" className={inputClass} value={line.quantity} onChange={(e) => updateRecipeLine(i, { quantity: Number(e.target.value) })} />
                     <input className={inputClass} value={line.unit} onChange={(e) => updateRecipeLine(i, { unit: e.target.value })} />
-                    <button type="button" onClick={() => setRecipeLines(recipeLines.filter((_, idx) => idx !== i))} className="h-12 rounded-xl border-2 border-border text-red-600 font-bold focus-ring">×</button>
+                    <button type="button" onClick={() => setRecipeLines(recipeLines.filter((_, idx) => idx !== i))} className="h-12 rounded-xl border border-border text-red font-bold focus-ring">×</button>
                   </div>
                 ))}
-                {recipeLines.length === 0 && <p className="text-sm font-semibold text-muted bg-cream border-2 border-border rounded-xl p-3">No recipe ingredients yet.</p>}
+                {recipeLines.length === 0 && <p className="text-sm font-semibold text-text-muted bg-surface-2 border border-border rounded-xl p-3">No recipe ingredients yet.</p>}
               </div>
               {showVersions && detail?.recipe?.snapshots && (
-                <div className="mt-3 p-3 bg-cream rounded-xl border-2 border-border">
-                  <p className="font-bold text-sm mb-2">Version history</p>
+                <div className="mt-3 p-3 bg-surface-2 rounded-xl border border-border text-text-primary">
+                  <p className="font-bold text-sm mb-2 text-text-primary">Version history</p>
                   <ul className="space-y-1 text-sm">{detail.recipe.snapshots.map((s) => (
-                    <li key={s.id} className="flex justify-between"><span>v{s.version} · {format(new Date(s.createdAt), "dd MMM HH:mm")}</span><span className="text-muted">{JSON.parse(s.ingredientsJson).length} ingredients</span></li>
+                    <li key={s.id} className="flex justify-between"><span>v{s.version} · {format(new Date(s.createdAt), "dd MMM HH:mm")}</span><span className="text-text-muted">{JSON.parse(s.ingredientsJson).length} ingredients</span></li>
                   ))}</ul>
                 </div>
               )}
             </section>
             <section>
-              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-black">Substitution Rules</h3>
+              <div className="flex items-center justify-between mb-3"><h3 className="font-bold text-text-primary">Substitution Rules</h3>
                 <BtnSecondary onClick={() => setSubstitutions([...substitutions, { primaryIngredientId: ingredients[0]?.id ?? "", primaryName: ingredients[0]?.name ?? "", substituteIngredientId: ingredients[0]?.id ?? "", substituteName: ingredients[0]?.name ?? "", ratio: 1, requiresApproval: false }])}><Plus size={16} /> Add Rule</BtnSecondary></div>
               <div className="space-y-2">
                 {substitutions.map((s, i) => (
@@ -510,30 +509,30 @@ function MenuPageContent() {
                     <select className={selectClass} value={s.primaryIngredientId} onChange={(e) => { const ing = ingredients.find((x) => x.id === e.target.value); setSubstitutions(substitutions.map((x, idx) => idx === i ? { ...x, primaryIngredientId: e.target.value, primaryName: ing?.name ?? "" } : x)); }}>{ingredients.map((ing) => <option key={ing.id} value={ing.id}>{ing.name}</option>)}</select>
                     <select className={selectClass} value={s.substituteIngredientId} onChange={(e) => { const ing = ingredients.find((x) => x.id === e.target.value); setSubstitutions(substitutions.map((x, idx) => idx === i ? { ...x, substituteIngredientId: e.target.value, substituteName: ing?.name ?? "" } : x)); }}>{ingredients.map((ing) => <option key={ing.id} value={ing.id}>{ing.name}</option>)}</select>
                     <input type="number" step="0.1" className={inputClass} value={s.ratio} title="Ratio" onChange={(e) => setSubstitutions(substitutions.map((x, idx) => idx === i ? { ...x, ratio: Number(e.target.value) } : x))} />
-                    <label className="flex items-center gap-1.5 text-xs font-bold whitespace-nowrap"><input type="checkbox" checked={s.requiresApproval} onChange={(e) => setSubstitutions(substitutions.map((x, idx) => idx === i ? { ...x, requiresApproval: e.target.checked } : x))} className="w-4 h-4 accent-[#F4B315]" /> Approve</label>
-                    <button type="button" onClick={() => setSubstitutions(substitutions.filter((_, idx) => idx !== i))} className="h-12 rounded-xl border-2 border-border text-red-600 font-bold focus-ring">×</button>
+                    <label className="flex items-center gap-1.5 text-xs font-bold whitespace-nowrap text-text-primary"><input type="checkbox" checked={s.requiresApproval} onChange={(e) => setSubstitutions(substitutions.map((x, idx) => idx === i ? { ...x, requiresApproval: e.target.checked } : x))} className="w-4 h-4 accent-[#FED500]" /> Approve</label>
+                    <button type="button" onClick={() => setSubstitutions(substitutions.filter((_, idx) => idx !== i))} className="h-12 rounded-xl border border-border text-red font-bold focus-ring">×</button>
                   </div>
                 ))}
-                {substitutions.length === 0 && <p className="text-sm font-semibold text-muted bg-cream border-2 border-border rounded-xl p-3">No substitution rules. e.g. 1 Paneer = 1.2 Tofu.</p>}
+                {substitutions.length === 0 && <p className="text-sm font-semibold text-text-muted bg-surface-2 border border-border rounded-xl p-3">No substitution rules. e.g. 1 Paneer = 1.2 Tofu.</p>}
               </div>
             </section>
           </div>
         )}
 
         {drawerTab === "cost" && (
-          <div className="space-y-1">
+          <div className="space-y-1 text-text-primary">
             <FormField label="Recipe Cost (₹)"><input type="number" className={inputClass} value={form.recipeCost} onChange={(e) => setForm({ ...form, recipeCost: Number(e.target.value) })} /></FormField>
             <FormField label="Margin-alert threshold (%)" hint="Highlight this item when its margin drops below this."><input type="number" className={inputClass} value={form.marginAlertThreshold} onChange={(e) => setForm({ ...form, marginAlertThreshold: e.target.value === "" ? "" : Number(e.target.value) })} placeholder="— none —" /></FormField>
-            <div className={cn("p-4 rounded-xl mt-4", marginBelow ? "bg-red-50 border-2 border-red-200" : "bg-cream")}>
-              <p className="font-bold flex items-center gap-2">{marginBelow && <AlertTriangle size={16} className="text-red-600" />}Gross Margin: {liveMargin.toFixed(1)}%</p>
-              <p className="text-muted text-sm mt-1">Profit per item: {formatCurrency(form.basePrice - form.recipeCost)}</p>
-              {marginBelow && <p className="text-red-700 text-sm font-bold mt-1">Below your {Number(form.marginAlertThreshold)}% alert threshold.</p>}
+            <div className={cn("p-4 rounded-xl mt-4 border", marginBelow ? "bg-red-surface border-[var(--border-critical)] text-red" : "bg-surface-2 border-border text-text-primary")}>
+              <p className="font-bold flex items-center gap-2">{marginBelow && <AlertTriangle size={16} className="text-red" />}Gross Margin: {liveMargin.toFixed(1)}%</p>
+              <p className="text-text-muted text-sm mt-1">Profit per item: {formatCurrency(form.basePrice - form.recipeCost)}</p>
+              {marginBelow && <p className="text-red text-sm font-bold mt-1">Below your {Number(form.marginAlertThreshold)}% alert threshold.</p>}
             </div>
           </div>
         )}
 
         {drawerTab === "availability" && (
-          <div className="space-y-1">
+          <div className="space-y-1 text-text-primary">
             <FormField label="Availability">
               <select className={selectClass} value={form.availability} onChange={(e) => setForm({ ...form, availability: e.target.value })}>
                 <option value="available">Available</option>
@@ -541,7 +540,7 @@ function MenuPageContent() {
                 <option value="unavailable_delivery">Unavailable for Delivery (dine-in only)</option>
               </select>
             </FormField>
-            {detail?.autoOutOfStock && <p className="text-sm font-bold text-red-700 bg-red-50 border-2 border-red-200 rounded-xl p-3">Auto: Out of Stock — an ingredient is depleted. Saving as Available overrides this.</p>}
+            {detail?.autoOutOfStock && <p className="text-sm font-bold text-red bg-red-surface border border-[var(--border-critical)] rounded-xl p-3">Auto: Out of Stock — an ingredient is depleted. Saving as Available overrides this.</p>}
           </div>
         )}
 
@@ -572,9 +571,9 @@ function MenuPageContent() {
         confirmLabel="Delete & Reassign" destructive
         onConfirm={deleteCategory} onCancel={() => setCatReassign(null)} />
       {catReassign && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-white border-2 border-primary rounded-xl p-3 shadow-xl flex items-center gap-2">
-          <span className="text-sm font-bold">Reassign items to:</span>
-          <select className="h-10 px-3 border-2 border-border rounded-lg font-bold" value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] bg-surface-1 border border-yellow rounded-xl p-3 shadow-2xl flex items-center gap-2 text-text-primary">
+          <span className="text-sm font-bold text-text-primary">Reassign items to:</span>
+          <select className="h-10 px-3 border border-border bg-surface-2 text-text-primary rounded-lg font-bold" value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}>
             <option value="uncategorized">Uncategorized</option>
             {categories.filter((c) => c.id !== catReassign.id).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>

@@ -1,49 +1,119 @@
 @import "tailwindcss";
 
+html, body {
+  overflow: hidden;
+  height: 100%;
+  margin: 0;
+}
+
 :root {
-  /* Brand palette — white background variant */
-  --black: #1A141A;
-  --yellow: #F4B315;
-  --yellow-hover: #E0A000;
-  --sand: #D3AF85;
-  --sand-dark: #8B7355;
-  --cream: #FDF6E3;
-  --cream-dark: #F5EBD0;
+  /* ─────────────────────────────────────────────────────────────
+     SOBOS dark system design tokens (Exact live palette).
+     Depth comes from visual surface layering without shadows:
+     #0A0A0A (Canvas) -> #0F0F0F (Surface) -> #101010 (Raised/Nested)
+     ───────────────────────────────────────────────────────────── */
 
-  --background: #FFFFFF;
-  --foreground: #1A141A;
-  --surface: #FFFFFF;
-  --border: #E8DFC8;
-  --muted: #8B7355;
-  --primary: #F4B315;
-  --primary-hover: #E0A000;
-  --primary-foreground: #1A141A;
+  /* Canvas and surface ladder */
+  --bg: #0A0A0A;
+  --surface: #0F0F0F;
+  --surface-1: #0F0F0F;
+  --surface-2: #101010;
+  --surface-3: #181818;
+  --surface-raised: #101010;
 
-  --gray-50: #FDF6E3;
-  --gray-100: #F5EBD0;
-  --gray-200: #E8DFC8;
-  --gray-300: #D3AF85;
-  --gray-400: #B8956A;
-  --gray-500: #8B7355;
-  --gray-600: #6B5740;
-  --gray-700: #4A3D2E;
-  --gray-800: #2E251C;
-  --gray-900: #1A141A;
+  /* Borders — subtle, clean contrast */
+  --border: #1F1F1F;
+  --border-strong: #2A2A2A;
+  --border-yellow: #423805;
+  --border-success: #0E361B;
+  --border-critical: #4D181B;
+  --border-warning: #422808;
 
-  --st-pending: #8B7355;
-  --st-confirmed: #D3AF85;
-  --st-preparing: #F4B315;
-  --st-ready: #5A8F4A;
-  --st-done: #8B7355;
-  --st-cancelled: #C44B4B;
+  /* Brand */
+  --yellow: #FED500;
+  --yellow-hover: #FFE033;
+  --yellow-surface: #1D1709;
+  --on-yellow: #0A0A0A;
 
-  --st-available: #5A8F4A;
-  --st-occupied: #C44B4B;
-  --st-reserved: #D3AF85;
-  --st-cleaning: #F4B315;
+  /* Text & Palette Accents */
+  --cream: #F5F1E8;
+  --sand: #B8AA96;
+  --text-primary: #F5F1E8;
+  --text-secondary: #B8AA96;
+  --text-muted: #8C8070;
+  --text-disabled: #4D463D;
 
-  --delta-up: #5A8F4A;
-  --delta-down: #C44B4B;
+  /* Semantic Status Colors */
+  --green: #2DD269;
+  --green-surface: #10170F;
+  --success: #2DD269;
+  --success-surface: #10170F;
+
+  --red: #FF4D57;
+  --red-surface: #1D1111;
+  --critical: #FF4D57;
+  --critical-surface: #1D1111;
+
+  --orange: #F59A23;
+  --orange-surface: #1D1509;
+  --warning: #F59A23;
+  --warning-surface: #1D1509;
+
+  --purple: #9B7BFF;
+  --purple-surface: #151224;
+  --info: #9B7BFF;
+  --info-surface: #151224;
+
+  /* Modal/overlay scrim */
+  --scrim: rgba(8, 5, 8, 0.72);
+
+  /* ── Legacy aliases ────────────────────────────────────────── */
+  --black: var(--text-primary);
+  --sand-dark: var(--text-secondary);
+  --cream-dark: var(--surface-3);
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --muted: var(--text-muted);
+  --primary: var(--yellow);
+  --primary-hover: var(--yellow-hover);
+  --primary-foreground: var(--on-yellow);
+
+  --gray-50: var(--surface-1);
+  --gray-100: var(--surface-2);
+  --gray-200: var(--surface-3);
+  --gray-300: var(--text-muted);
+  --gray-400: var(--text-muted);
+  --gray-500: var(--text-secondary);
+  --gray-600: var(--text-secondary);
+  --gray-700: var(--text-primary);
+  --gray-800: var(--text-primary);
+  --gray-900: var(--text-primary);
+
+  --st-pending: #8C8070;
+  --st-confirmed: #9B7BFF;
+  --st-preparing: #F59A23;
+  --st-ready: #2DD269;
+  --st-done: #8C8070;
+  --st-cancelled: #FF4D57;
+
+  --st-available: #2DD269;
+  --st-occupied: #FF4D57;
+  --st-reserved: #9B7BFF;
+  --st-cleaning: #F59A23;
+
+  --delta-up: var(--success);
+  --delta-down: var(--critical);
+
+  /* Tinted panel gradients & atmospheric fills */
+  --yellow-panel-gradient: linear-gradient(180deg, #1D1709 0%, #0F0F0F 100%);
+  --red-panel-gradient: linear-gradient(180deg, #1D1111 0%, #0F0F0F 100%);
+  --green-panel-gradient: linear-gradient(180deg, #10170F 0%, #0F0F0F 100%);
+  --chart-yellow-glow: linear-gradient(180deg, rgba(254,213,0,0.18) 0%, rgba(254,213,0,0.00) 100%);
+  --glow-yellow: linear-gradient(180deg, rgba(254,213,0,0.18) 0%, rgba(254,213,0,0.00) 100%);
+  --glow-success: linear-gradient(180deg, rgba(45,210,105,0.18) 0%, rgba(45,210,105,0.02) 100%);
+  --glow-critical: linear-gradient(180deg, rgba(255,77,87,0.18) 0%, rgba(255,77,87,0.02) 100%);
+  --glow-warning: linear-gradient(180deg, rgba(245,154,35,0.18) 0%, rgba(245,154,35,0.02) 100%);
 
   --sidebar-w: 272px;
   --sidebar-collapsed-w: 72px;
@@ -112,6 +182,72 @@
   --color-sand-dark: var(--sand-dark);
   --color-black: var(--black);
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Surface ladder + semantics as first-class utilities */
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-critical: var(--critical);
+  --color-info: var(--info);
+  --color-purple: var(--purple);
+  --color-purple-surface: var(--purple-surface);
+
+  /* `bg-white` is Tailwind's literal white, not a project token. 165 call sites
+     use it to mean "card surface" — rebasing it converts them all. */
+  --color-white: var(--surface-1);
+
+  /* No shadows anywhere: depth is the surface ladder. Kills 107 shadow-* uses. */
+  --shadow-2xs: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --shadow-2xl: none;
+
+  /* Palette scales used as light tints (50–200) and as state text (500–900).
+     Remapped so existing status styling reads correctly on dark. */
+  --color-red-50: var(--critical-surface);
+  --color-red-100: var(--critical-surface);
+  --color-red-200: var(--border-critical);
+  --color-red-300: var(--border-critical);
+  --color-red-400: var(--critical);
+  --color-red-500: var(--critical);
+  --color-red-600: var(--critical);
+  --color-red-700: var(--critical);
+  --color-red-800: var(--critical);
+  --color-red-900: var(--critical);
+
+  --color-amber-50: var(--warning-surface);
+  --color-amber-100: var(--warning-surface);
+  --color-amber-200: var(--border-warning);
+  --color-amber-300: var(--border-warning);
+  --color-amber-500: var(--warning);
+  --color-amber-600: var(--warning);
+  --color-amber-700: var(--warning);
+  --color-amber-800: var(--warning);
+  --color-amber-900: var(--warning);
+
+  --color-green-50: var(--success-surface);
+  --color-green-100: var(--success-surface);
+  --color-green-200: var(--border-success);
+  --color-green-300: var(--border-success);
+  --color-green-400: var(--success);
+  --color-green-600: var(--success);
+  --color-green-700: var(--success);
+  --color-green-800: var(--success);
+  --color-green-900: var(--success);
+
+  --color-emerald-50: var(--success-surface);
+  --color-emerald-100: var(--success-surface);
+  --color-emerald-600: var(--success);
+  --color-emerald-700: var(--success);
 }
 
 * {
@@ -157,7 +293,7 @@ h1, h2, h3, h4 {
 }
 
 .focus-ring:focus-visible {
-  outline: 3px solid var(--yellow);
+  outline: 2px solid var(--yellow);
   outline-offset: 2px;
 }
 
@@ -169,7 +305,7 @@ h1, h2, h3, h4 {
   padding: var(--btn-pad-y) var(--btn-pad-x);
   font-size: var(--btn-fs);
   font-weight: 700;
-  color: var(--black);
+  color: var(--on-yellow);
   background: var(--yellow);
   border: 2px solid var(--yellow);
   border-radius: 0.75rem;
@@ -192,21 +328,21 @@ h1, h2, h3, h4 {
   padding: var(--btn-pad-y) var(--btn-pad-x);
   font-size: var(--btn-fs);
   font-weight: 700;
-  color: var(--black);
-  background: var(--surface);
-  border: 2px solid var(--border);
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
   cursor: pointer;
   transition: background 0.15s;
   min-height: var(--btn-min-h);
 }
 .btn-secondary:hover {
-  background: var(--cream);
-  border-color: var(--sand);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
 }
 
 @keyframes flash-update {
-  0% { background-color: #F4B31533; }
+  0% { background-color: #FED50033; }
   100% { background-color: transparent; }
 }
 
@@ -236,32 +372,32 @@ h1, h2, h3, h4 {
 }
 
 .page-surface {
-  background: var(--surface);
-  border: 2px solid var(--border);
-  border-radius: 1rem;
-  box-shadow: 0 1px 3px rgb(26 20 26 / 0.04);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
 
 .stat-card {
   padding: 1rem 1.25rem;
-  border-radius: 1rem;
-  border: 2px solid var(--border);
-  background: var(--surface);
-  transition: box-shadow 0.15s, transform 0.1s;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .stat-card:hover {
-  box-shadow: 0 4px 12px rgb(26 20 26 / 0.06);
+  background: var(--surface-3);
+  border-color: var(--border-strong);
 }
-.stat-card--success { border-color: #5A8F4A44; background: #5A8F4A0D; }
-.stat-card--warning { border-color: #F4B31555; background: #F4B31514; }
-.stat-card--danger { border-color: #C44B4B44; background: #C44B4B0D; }
-.stat-card--active { border-color: var(--primary); background: #F4B31518; }
+.stat-card--success { border-color: var(--border-success); background: var(--success-surface); }
+.stat-card--warning { border-color: var(--border-warning); background: var(--warning-surface); }
+.stat-card--danger { border-color: var(--border-critical); background: var(--critical-surface); }
+.stat-card--active { border-color: var(--border-yellow); background: var(--yellow-surface); }
 
 .scrollbar-thin::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: var(--sand);
+  background: var(--border-strong);
   border-radius: 4px;
 }

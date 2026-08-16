@@ -1,6 +1,7 @@
 "use client";
 
-import { formatCurrency } from "@/lib/utils";
+import { useEffect, useRef, useState } from "react";
+import { cn, formatCurrency } from "@/lib/utils";
 
 interface PerformanceSummaryRowProps {
   ordersToday: number;
@@ -8,7 +9,103 @@ interface PerformanceSummaryRowProps {
   revenueTarget?: number;
   avgTicket: number;
   pendingOrders: number;
+  occupiedTables: number;
+  totalTables?: number;
   hourDelta: number;
+  peakPeriod?: string;
+  loading?: boolean;
+  /** No orders yet today — render em-dashes rather than a fake ₹0. */
+  preService?: boolean;
+}
+
+/** Count-up on first load only; instant under prefers-reduced-motion. */
+function useCountUp(value: number, enabled: boolean) {
+  const [shown, setShown] = useState(enabled ? 0 : value);
+  const done = useRef(false);
+
+  useEffect(() => {
+    if (!enabled || done.current) {
+      setShown(value);
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShown(value);
+      done.current = true;
+      return;
+    }
+    done.current = true;
+    const start = performance.now();
+    const DURATION = 400;
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / DURATION);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setShown(value * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, enabled]);
+
+  return shown;
+}
+
+function Kpi({
+  label,
+  value,
+  delta,
+  deltaTone = "up",
+  valueTone = "neutral",
+  sub,
+  loading = false,
+}: {
+  label: string;
+  value: string;
+  delta?: string;
+  deltaTone?: "up" | "down" | "neutral";
+  valueTone?: "neutral" | "warning" | "info" | "muted";
+  sub?: string;
+  loading?: boolean;
+}) {
+  return (
+    <div className="px-4 sm:px-6 py-1.5 first:pl-0">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-text-muted">
+        {label}
+      </div>
+
+      {loading ? (
+        <div className="h-[38px] mt-1.5 w-24 rounded-md bg-surface-3" />
+      ) : (
+        <div
+          className={cn(
+            "mt-1 font-semibold tabular-nums text-[34px] leading-[38px] tracking-tight",
+            valueTone === "neutral" && "text-text-primary",
+            valueTone === "warning" && "text-warning",
+            valueTone === "info" && "text-info",
+            valueTone === "muted" && "text-text-muted"
+          )}
+        >
+          {value}
+        </div>
+      )}
+
+      <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
+        {delta && !loading && (
+          <span
+            className={cn(
+              "font-semibold",
+              deltaTone === "up" && "text-success",
+              deltaTone === "down" && "text-critical",
+              deltaTone === "neutral" && "text-text-muted"
+            )}
+          >
+            {delta}
+          </span>
+        )}
+        {sub && <span className="text-text-muted">{sub}</span>}
+      </div>
+    </div>
+  );
 }
 
 export function PerformanceSummaryRow({
@@ -17,100 +114,99 @@ export function PerformanceSummaryRow({
   revenueTarget = 60000,
   avgTicket,
   pendingOrders,
+  occupiedTables,
+  totalTables,
   hourDelta,
+  peakPeriod,
+  loading = false,
+  preService = false,
 }: PerformanceSummaryRowProps) {
   const targetPct = revenueTarget > 0 ? Math.min(100, Math.round((revenueToday / revenueTarget) * 100)) : 0;
+  const animated = useCountUp(revenueToday, !loading && !preService);
+  const blank = loading || preService;
 
   return (
-    <div className="mb-6 space-y-2">
-      <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-muted">
-        <span>Today's Performance</span>
-        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-black">
-          <span className="w-1.5 h-1.5 rounded-full bg-yellow animate-pulse" />
-          ● LIVE
-        </span>
+    <section
+      className="mb-7 rounded-[16px] border border-border bg-surface-1/90 p-5 sm:p-6"
+      aria-label="Today performance strip"
+    >
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-border/70 -mx-2 sm:-mx-4">
+        <Kpi
+          label="Revenue"
+          value={blank ? "—" : formatCurrency(Math.round(animated))}
+          delta={blank ? undefined : "↑ 12.1%"}
+          deltaTone="up"
+          sub={preService ? "not open yet" : undefined}
+          loading={loading}
+        />
+        <Kpi
+          label="Orders"
+          value={blank ? "—" : ordersToday.toLocaleString()}
+          delta={blank ? undefined : `↑ ${Math.abs(hourDelta || 8.4)}%`}
+          deltaTone="up"
+          loading={loading}
+        />
+        <Kpi
+          label="Avg order"
+          value={blank ? "—" : formatCurrency(avgTicket)}
+          delta={blank ? undefined : "↑ 3.2%"}
+          deltaTone="up"
+          loading={loading}
+        />
+        <Kpi
+          label="Active"
+          value={loading ? "—" : String(pendingOrders)}
+          valueTone={pendingOrders > 0 ? "warning" : "neutral"}
+          sub="live"
+          loading={loading}
+        />
+        <Kpi
+          label="Tables"
+          value={loading ? "—" : totalTables ? `${occupiedTables}/${totalTables}` : String(occupiedTables)}
+          valueTone={occupiedTables > 0 ? "info" : "neutral"}
+          sub="occupied"
+          loading={loading}
+        />
       </div>
 
-      {/* ONE COHESIVE PERFORMANCE COMPOSITION CONTAINER */}
-      <div className="p-5 rounded-2xl bg-white border border-border/80 shadow-2xs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-6 items-center">
-          {/* PRIMARY KPI: REVENUE TODAY (4 cols - Dominant size & weight with Target Context) */}
-          <div className="lg:col-span-4 space-y-1.5 lg:border-r border-border/50 lg:pr-6">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-extrabold uppercase tracking-wider text-sand-dark">
-                Revenue Today
-              </div>
-              <span className="text-[11px] font-extrabold text-black bg-cream border border-border/60 px-2 py-0.5 rounded-full">
-                {targetPct}% target
-              </span>
-            </div>
-
-            <div className="text-3xl sm:text-4xl font-black text-black tracking-tight tabular-nums">
-              {formatCurrency(revenueToday)}
-            </div>
-
-            {/* Target Progress Bar */}
-            <div className="h-1.5 rounded-full bg-cream border border-border/50 overflow-hidden my-1">
-              <div
-                className="h-full bg-yellow rounded-full transition-all duration-500"
+      {/* Context strip — target progress reads without arithmetic */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border/70 pt-4 text-[12px]">
+        {preService ? (
+          <div className="flex items-center gap-2">
+            <span className="text-text-muted">Daily Target:</span>
+            <span className="font-semibold text-text-primary">{formatCurrency(revenueTarget)}</span>
+            <span className="text-text-muted">· Pre-service</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="text-text-muted">Target</span>
+            <span
+              className="h-1.5 w-32 rounded-full bg-surface-3 overflow-hidden shrink-0"
+              role="progressbar"
+              aria-valuenow={targetPct}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Revenue target progress"
+            >
+              <span
+                className="block h-full rounded-full bg-yellow transition-[width] duration-500"
                 style={{ width: `${targetPct}%` }}
               />
-            </div>
-
-            <div className="text-xs font-bold text-black flex items-center justify-between pt-0.5">
-              <span className="flex items-center gap-1">
-                <span>↑ 12.1%</span>
-                <span className="text-muted font-medium">today</span>
-              </span>
-              <span className="text-muted font-semibold text-[11px]">
-                {formatCurrency(revenueTarget)} daily target
-              </span>
-            </div>
+            </span>
+            <span className="font-semibold text-text-primary tabular-nums">
+              {formatCurrency(revenueToday)} / {formatCurrency(revenueTarget)}
+            </span>
+            <span className="text-text-muted">· {targetPct}% achieved</span>
           </div>
+        )}
 
-          {/* SECONDARY KPI: ORDERS TODAY (3 cols) */}
-          <div className="lg:col-span-3 space-y-1 lg:border-r border-border/50 lg:pr-6">
-            <div className="text-xs font-bold uppercase tracking-wider text-muted">
-              Orders Today
-            </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums">
-              {ordersToday.toLocaleString()}
-            </div>
-            <div className="text-xs font-bold text-black flex items-center gap-1 pt-0.5">
-              <span>↑ {Math.abs(hourDelta || 8.4)}%</span>
-              <span className="text-muted font-medium">same period</span>
-            </div>
+        {peakPeriod && !preService && (
+          <div className="flex items-center gap-2">
+            <span className="text-text-muted">Peak</span>
+            <span className="font-semibold text-text-primary">{peakPeriod}</span>
           </div>
-
-          {/* SECONDARY KPI: AVG TICKET (3 cols) */}
-          <div className="lg:col-span-3 space-y-1 lg:border-r border-border/50 lg:pr-6">
-            <div className="text-xs font-bold uppercase tracking-wider text-muted">
-              Avg Ticket
-            </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums">
-              {formatCurrency(avgTicket)}
-            </div>
-            <div className="text-xs font-bold text-black flex items-center gap-1 pt-0.5">
-              <span>↑ 3.2%</span>
-              <span className="text-muted font-medium">per order spend</span>
-            </div>
-          </div>
-
-          {/* LIVE OPERATIONAL KPI: ACTIVE ORDERS (2 cols) */}
-          <div className="lg:col-span-2 space-y-1">
-            <div className="text-xs font-bold uppercase tracking-wider text-muted">
-              Active Orders
-            </div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums">
-              {pendingOrders}
-            </div>
-            <div className="text-xs font-bold text-black flex items-center gap-1 pt-0.5">
-              <span className="w-2 h-2 rounded-full bg-yellow animate-pulse" />
-              <span className="text-black">LIVE kitchen</span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
-    </div>
+    </section>
   );
 }

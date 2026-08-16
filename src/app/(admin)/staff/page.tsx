@@ -97,10 +97,10 @@ function StaffPageContent() {
   const columns: Column<StaffRow>[] = [
     { key: "name", header: "Name" }, { key: "phone", header: "Phone" },
     { key: "role", header: "Role", render: (r) => r.locationRoles.map((lr) => lr.role.name).join(", ") || "—" },
-    { key: "invite", header: "Invite", render: (r) => <span className={cn("px-2 py-0.5 rounded-lg text-xs font-bold capitalize", INVITE_PILL[r.inviteStatus] ?? "bg-cream")}>{r.inviteStatus}</span> },
+    { key: "invite", header: "Invite", render: (r) => <span className={cn("px-2 py-0.5 rounded-lg text-xs font-bold capitalize border border-border", INVITE_PILL[r.inviteStatus] ?? "bg-surface-2 text-text-secondary")}>{r.inviteStatus}</span> },
     { key: "status", header: "Status", render: (r) => <StatusDot status={r.status === "active" ? "active" : "cancelled"} label={r.status} /> },
     { key: "clock", header: "Today", render: (r) => r.attendance[0]?.clockOut ? "Off duty" : r.attendance[0] ? `In ${format(new Date(r.attendance[0].clockIn), "HH:mm")}` : "—" },
-    { key: "act", header: "", render: (r) => r.inviteStatus !== "accepted" ? <button type="button" onClick={(e) => { e.stopPropagation(); resend(r.id); }} className="text-xs font-bold underline">Resend</button> : null },
+    { key: "act", header: "", render: (r) => r.inviteStatus !== "accepted" ? <button type="button" onClick={(e) => { e.stopPropagation(); resend(r.id); }} className="text-xs font-bold underline text-yellow">Resend</button> : null },
   ];
 
   return (
@@ -115,14 +115,14 @@ function StaffPageContent() {
         { key: "name", header: "Staff", render: (r: AttRow) => r.user.name },
         { key: "in", header: "Clock In", render: (r: AttRow) => format(new Date(r.clockIn), "dd MMM HH:mm") },
         { key: "out", header: "Clock Out", render: (r: AttRow) => r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "Active" },
-        { key: "flags", header: "Flags", render: (r: AttRow) => <span className="flex gap-1">{r.isLate && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">late</span>}{r.autoClosed && <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">auto-closed</span>}</span> },
-        { key: "act", header: "Action", render: (r: AttRow) => <span className="flex gap-2" onClick={(e) => e.stopPropagation()}>{!r.clockOut && <button type="button" onClick={() => clockOut(r.id)} className="font-bold underline">Clock out</button>}<button type="button" onClick={() => { setAdjust(r); setAdjustForm({ clockIn: new Date(r.clockIn).toISOString().slice(0, 16), clockOut: r.clockOut ? new Date(r.clockOut).toISOString().slice(0, 16) : "", reason: "" }); }} className="font-bold underline">Adjust</button></span> },
+        { key: "flags", header: "Flags", render: (r: AttRow) => <span className="flex gap-1">{r.isLate && <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-surface border border-[var(--border-warning)] text-orange font-bold">late</span>}{r.autoClosed && <span className="text-xs px-1.5 py-0.5 rounded bg-red-surface border border-[var(--border-critical)] text-red font-bold">auto-closed</span>}</span> },
+        { key: "act", header: "Action", render: (r: AttRow) => <span className="flex gap-2" onClick={(e) => e.stopPropagation()}>{!r.clockOut && <button type="button" onClick={() => clockOut(r.id)} className="font-bold underline text-yellow">Clock out</button>}<button type="button" onClick={() => { setAdjust(r); setAdjustForm({ clockIn: new Date(r.clockIn).toISOString().slice(0, 16), clockOut: r.clockOut ? new Date(r.clockOut).toISOString().slice(0, 16) : "", reason: "" }); }} className="font-bold underline text-text-primary">Adjust</button></span> },
       ]} data={attendance} selectable={false} onRowClick={() => {}} />}
 
       {tab === "schedule" && (
         <div className="space-y-4">
-          {gaps.length > 0 && <div className="p-3 rounded-xl border-2 border-amber-300 bg-amber-50 text-sm font-bold text-amber-800">Coverage gaps: {gaps.map((g) => DAYS[g]).join(", ")} have no published shifts.</div>}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-white border-2 border-border rounded-xl">
+          {gaps.length > 0 && <div className="p-3 rounded-xl border border-[var(--border-warning)] bg-yellow-surface text-sm font-bold text-orange">Coverage gaps: {gaps.map((g) => DAYS[g]).join(", ")} have no published shifts.</div>}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-surface-1 border border-border rounded-xl shadow-2xs">
             <FormField label="Staff"><select className={selectClass} value={scheduleForm.userId} onChange={(e) => setScheduleForm({ ...scheduleForm, userId: e.target.value })}>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></FormField>
             <FormField label="Location"><select className={selectClass} value={scheduleForm.locationId} onChange={(e) => setScheduleForm({ ...scheduleForm, locationId: e.target.value })}>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></FormField>
             <FormField label="Day"><select className={selectClass} value={scheduleForm.dayOfWeek} onChange={(e) => setScheduleForm({ ...scheduleForm, dayOfWeek: Number(e.target.value) })}>{DAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select></FormField>
@@ -132,21 +132,21 @@ function StaffPageContent() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             {DAYS.map((d, i) => (
-              <div key={d} className={cn("p-3 rounded-xl border-2 min-h-[100px]", gaps.includes(i) ? "border-amber-300 bg-amber-50/40" : "border-border bg-white")}>
-                <div className="font-bold text-sm mb-2">{d}</div>
+              <div key={d} className={cn("p-3 rounded-xl border min-h-[100px]", gaps.includes(i) ? "border-[var(--border-warning)] bg-yellow-surface" : "border-border bg-surface-1")}>
+                <div className="font-bold text-sm mb-2 text-text-primary">{d}</div>
                 {schedule.filter((s) => s.dayOfWeek === i).map((s) => (
-                  <div key={s.id} className="text-xs p-1.5 mb-1 rounded bg-cream font-semibold">{staff.find((u) => u.id === s.userId)?.name ?? "?"}<br />{s.startTime}–{s.endTime}</div>
+                  <div key={s.id} className="text-xs p-1.5 mb-1 rounded bg-surface-2 border border-border font-semibold text-text-primary">{staff.find((u) => u.id === s.userId)?.name ?? "?"}<br />{s.startTime}–{s.endTime}</div>
                 ))}
               </div>
             ))}
           </div>
           <div className="page-surface p-4">
-            <h3 className="font-bold mb-2">Swap-approval queue</h3>
-            {swaps.filter((s) => s.status === "pending").length === 0 ? <p className="text-muted font-medium text-sm">No pending swap requests.</p> : (
+            <h3 className="font-bold mb-2 text-text-primary">Swap-approval queue</h3>
+            {swaps.filter((s) => s.status === "pending").length === 0 ? <p className="text-text-muted font-medium text-sm">No pending swap requests.</p> : (
               <ul className="space-y-2">{swaps.filter((s) => s.status === "pending").map((s) => (
-                <li key={s.id} className="flex items-center justify-between p-3 bg-cream rounded-lg">
-                  <span className="font-bold">{s.requesterName} {s.withName && `↔ ${s.withName}`} <span className="text-muted font-medium">{s.reason}</span></span>
-                  <span className="flex gap-2"><button type="button" onClick={() => swapAction(s.id, "approved")} className="font-bold underline">Approve</button><button type="button" onClick={() => swapAction(s.id, "rejected")} className="font-bold underline text-red-600">Reject</button></span>
+                <li key={s.id} className="flex items-center justify-between p-3 bg-surface-2 border border-border rounded-lg text-text-primary">
+                  <span className="font-bold">{s.requesterName} {s.withName && `↔ ${s.withName}`} <span className="text-text-muted font-medium">{s.reason}</span></span>
+                  <span className="flex gap-2"><button type="button" onClick={() => swapAction(s.id, "approved")} className="font-bold underline text-yellow">Approve</button><button type="button" onClick={() => swapAction(s.id, "rejected")} className="font-bold underline text-red">Reject</button></span>
                 </li>
               ))}</ul>
             )}
@@ -209,7 +209,7 @@ function StaffPageContent() {
 
       {/* ── Bulk invite ── */}
       <Drawer open={showBulk} onClose={() => setShowBulk(false)} title="Bulk Invite (CSV)" width="600px">
-        <p className="text-sm text-muted font-medium mb-2">One per line: <code className="bg-cream px-1 rounded">phone,name,role,location</code>. Duplicates and missing phones are skipped with reasons.</p>
+        <p className="text-sm text-text-muted font-medium mb-2">One per line: <code className="bg-surface-2 text-yellow px-1.5 py-0.5 border border-border rounded">phone,name,role,location</code>. Duplicates and missing phones are skipped with reasons.</p>
         <textarea className={`${inputClass} min-h-40 font-mono text-sm`} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="9876543210,Asha,Cashier,Main Branch" />
         <BtnPrimary onClick={submitBulk} className="mt-3"><Upload size={18} /> Validate & Invite</BtnPrimary>
         {bulkResults && (

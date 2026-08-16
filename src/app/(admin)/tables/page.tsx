@@ -15,10 +15,10 @@ interface TableRow { id: string; label: string; section: { id: string; name: str
 interface Section { id: string; name: string; _count: { tables: number } }
 
 const STATUS_COLORS: Record<string, string> = {
-  available: "bg-green-100 border-green-400 text-green-900 hover:bg-green-200",
-  occupied: "bg-red-100 border-red-400 text-red-900 hover:bg-red-200",
-  reserved: "bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100",
-  cleaning: "bg-yellow-100 border-yellow-400 text-yellow-900 hover:bg-yellow-200",
+  available: "bg-green-surface border-[var(--border-success)] text-green hover:bg-green-surface/80",
+  occupied: "bg-red-surface border-[var(--border-critical)] text-red hover:bg-red-surface/80",
+  reserved: "bg-purple-surface border-purple/40 text-purple hover:bg-purple-surface/80",
+  cleaning: "bg-orange-surface border-[var(--border-warning)] text-orange hover:bg-orange-surface/80",
 };
 const STATUS_LABELS: Record<string, string> = { "": "All Tables", available: "Available", occupied: "Occupied", reserved: "Reserved", cleaning: "Cleaning" };
 const TABLE_CFG_DEFAULT = { cleaningTimerMin: 10, autoTransition: true, allowWithoutQr: true, requireGuestCount: true };
@@ -94,11 +94,11 @@ export default function TablesPage() {
   const downloadQrs = () => { const content = sortedTables.map((t) => `${t.label},${t.qrCode ?? `QR-${t.label}`}`).join("\n"); const blob = new Blob([`Table,QRCode\n${content}`], { type: "text/csv" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "table-qr-codes.csv"; a.click(); URL.revokeObjectURL(url); };
 
   const columns: Column<TableRow>[] = [
-    { key: "label", header: "Table", render: (r) => <span className="inline-flex items-center gap-2"><span className="w-9 h-9 rounded-lg bg-cream border border-border flex items-center justify-center font-bold text-sm">{r.label.replace(/[^0-9]/g, "")}</span>{r.label}</span> },
+    { key: "label", header: "Table", render: (r) => <span className="inline-flex items-center gap-2"><span className="w-9 h-9 rounded-lg bg-surface-2 border border-border flex items-center justify-center font-bold text-sm text-text-primary">{r.label.replace(/[^0-9]/g, "")}</span>{r.label}</span> },
     { key: "section", header: "Section", render: (r) => r.section?.name ?? "Unsectioned" },
     { key: "capacity", header: "Seats", render: (r) => `${r.minCapacity}–${r.maxCapacity}` },
     { key: "status", header: "Status", render: (r) => <StatusDot status={r.status} /> },
-    { key: "session", header: "Live Session", render: (r) => r.sessions[0] ? <span className="inline-flex items-center gap-1.5 text-sm"><Users size={14} className="text-muted" />{r.sessions[0].guestCount} · {formatCurrency(r.sessions[0].orderTotal)}</span> : r.status === "cleaning" ? <button type="button" onClick={(e) => { e.stopPropagation(); markClean(r.id); }} className="text-sm font-bold underline">Mark clean</button> : <span className="text-muted">—</span> },
+    { key: "session", header: "Live Session", render: (r) => r.sessions[0] ? <span className="inline-flex items-center gap-1.5 text-sm"><Users size={14} className="text-text-muted" />{r.sessions[0].guestCount} · {formatCurrency(r.sessions[0].orderTotal)}</span> : r.status === "cleaning" ? <button type="button" onClick={(e) => { e.stopPropagation(); markClean(r.id); }} className="text-sm font-bold underline text-yellow">Mark clean</button> : <span className="text-text-muted">—</span> },
   ];
   const filterOptions = [
     { value: "", label: "All", count: tables.length },
@@ -126,17 +126,17 @@ export default function TablesPage() {
 
       {tab === "board" && (
         <div className="page-surface p-5 min-h-[420px]">
-          <p className="text-sm font-medium text-muted mb-4">Drag tables to reposition · click to manage · board auto-refreshes every 10s</p>
-          <div className="relative min-h-[360px] bg-cream/40 rounded-2xl border-2 border-dashed border-border">
-            {sortedTables.length === 0 && <p className="absolute inset-0 flex items-center justify-center text-muted font-semibold">No tables match this filter</p>}
+          <p className="text-sm font-medium text-text-muted mb-4">Drag tables to reposition · click to manage · board auto-refreshes every 10s</p>
+          <div className="relative min-h-[360px] bg-[#0A0A0A] rounded-2xl border border-dashed border-border">
+            {sortedTables.length === 0 && <p className="absolute inset-0 flex items-center justify-center text-text-muted font-semibold">No tables match this filter</p>}
             {sortedTables.map((table) => (
               <button key={table.id} type="button" onClick={() => openEdit(table)}
-                className={cn("absolute flex flex-col items-center justify-center border-2 rounded-xl text-sm font-bold focus-ring hover:scale-105 transition-transform shadow-sm", STATUS_COLORS[table.status], table.shape === "round" && "rounded-full")}
+                className={cn("absolute flex flex-col items-center justify-center border-2 rounded-2xl text-sm font-bold focus-ring hover:scale-105 transition-transform shadow-sm", STATUS_COLORS[table.status], table.shape === "round" && "rounded-full")}
                 style={{ left: table.posX, top: table.posY, width: table.maxCapacity > 4 ? 92 : 76, height: table.maxCapacity > 4 ? 92 : 76 }}
                 title={`${table.label} — ${table.status}`} draggable
                 onDragEnd={(e) => { const board = e.currentTarget.parentElement?.getBoundingClientRect(); if (!board) return; apiFetch("/api/tables", { method: "PATCH", body: JSON.stringify({ id: table.id, posX: Math.max(0, e.clientX - board.left - 38), posY: Math.max(0, e.clientY - board.top - 38) }) }).then(() => load()).catch(() => toast("Could not move table", "error")); }}>
-                <span className="text-base">{table.label}</span>
-                <span className="text-[10px] font-semibold opacity-80 capitalize mt-0.5">{table.status}</span>
+                <span className="text-base font-extrabold text-text-primary">{table.label}</span>
+                <span className="text-[10px] font-bold capitalize mt-0.5">{table.status}</span>
               </button>
             ))}
           </div>
@@ -147,15 +147,15 @@ export default function TablesPage() {
 
       {tab === "sections" && (
         <div className="space-y-4">
-          <div className="flex gap-3 p-4 bg-cream/60 rounded-2xl border border-border">
+          <div className="flex gap-3 p-4 bg-surface-2 rounded-2xl border border-border">
             <input className={inputClass + " flex-1"} placeholder="New section name (e.g. Rooftop)" value={newSection} onChange={(e) => setNewSection(e.target.value)} />
             <BtnPrimary onClick={addSection}><Plus size={18} /> Add Section</BtnPrimary>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {sections.map((s) => (
               <div key={s.id} className="flex justify-between items-center p-5 page-surface">
-                <div><span className="font-bold text-lg">{s.name}</span><span className="ml-2 text-sm font-bold text-muted bg-cream px-3 py-1 rounded-full">{s._count.tables} tables</span></div>
-                <div className="flex gap-2"><button type="button" onClick={() => setEditSection({ ...s })} className="text-sm font-bold underline">Rename</button><button type="button" onClick={() => setConfirmSection(s)} className="text-red-600 text-sm font-bold underline">Delete</button></div>
+                <div><span className="font-bold text-lg text-text-primary">{s.name}</span><span className="ml-2 text-xs font-bold text-text-secondary bg-surface-3 border border-border px-3 py-1 rounded-full">{s._count.tables} tables</span></div>
+                <div className="flex gap-2"><button type="button" onClick={() => setEditSection({ ...s })} className="text-sm font-bold underline text-text-primary">Rename</button><button type="button" onClick={() => setConfirmSection(s)} className="text-red text-sm font-bold underline">Delete</button></div>
               </div>
             ))}
           </div>
@@ -168,10 +168,10 @@ export default function TablesPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sortedTables.map((t) => (
               <div key={t.id} className="p-5 page-surface">
-                <div className="flex items-start justify-between gap-2 mb-3"><div><div className="text-xl font-bold">{t.label}</div><div className="text-sm text-muted font-medium">{t.section?.name ?? "Unsectioned"}</div></div><StatusDot status={t.status} /></div>
-                <div className="aspect-square max-w-[140px] mx-auto bg-white border-2 border-border rounded-xl flex items-center justify-center mb-3"><QrCode size={64} className="text-black/80" strokeWidth={1.25} /></div>
-                <p className="text-center text-xs font-bold text-muted truncate">{t.qrCode ?? `QR-${t.label}`}</p>
-                <button type="button" onClick={() => regenerateQr(t.id)} className="mt-3 mx-auto flex items-center gap-1 text-xs font-bold text-black underline"><RefreshCw size={12} /> Regenerate</button>
+                <div className="flex items-start justify-between gap-2 mb-3"><div><div className="text-xl font-bold text-text-primary">{t.label}</div><div className="text-sm text-text-muted font-medium">{t.section?.name ?? "Unsectioned"}</div></div><StatusDot status={t.status} /></div>
+                <div className="aspect-square max-w-[140px] mx-auto bg-surface-2 border border-border rounded-xl flex items-center justify-center mb-3"><QrCode size={64} className="text-yellow" strokeWidth={1.25} /></div>
+                <p className="text-center text-xs font-bold text-text-muted truncate">{t.qrCode ?? `QR-${t.label}`}</p>
+                <button type="button" onClick={() => regenerateQr(t.id)} className="mt-3 mx-auto flex items-center gap-1 text-xs font-bold text-yellow underline hover:text-yellow-hover"><RefreshCw size={12} /> Regenerate</button>
               </div>
             ))}
           </div>
@@ -180,17 +180,17 @@ export default function TablesPage() {
 
       {tab === "allocate" && (
         <div className="page-surface p-5 max-w-lg">
-          <h3 className="font-bold mb-3 flex items-center gap-2"><Wand2 size={18} /> Table allocation</h3>
+          <h3 className="font-bold mb-3 flex items-center gap-2 text-text-primary"><Wand2 size={18} className="text-yellow" /> Table allocation</h3>
           <div className="flex items-end gap-3">
             <FormField label="Party size"><input type="number" className={inputClass} value={allocParty} onChange={(e) => setAllocParty(Number(e.target.value))} /></FormField>
             <BtnPrimary onClick={allocate} className="mb-5">Suggest</BtnPrimary>
           </div>
           {allocResult && (allocResult.suggestion ? (
             <div className="space-y-2">
-              <div className="p-4 rounded-xl border-2 border-primary bg-primary/10"><div className="font-bold">Best fit: {allocResult.suggestion.label}</div><div className="text-sm text-muted">{allocResult.suggestion.section?.name ?? "Unsectioned"} · seats {allocResult.suggestion.minCapacity}–{allocResult.suggestion.maxCapacity}</div></div>
-              {allocResult.alternatives.length > 0 && <div className="text-sm"><span className="font-bold">Alternatives: </span>{allocResult.alternatives.map((a) => a.label).join(", ")}</div>}
+              <div className="p-4 rounded-xl border border-yellow bg-yellow-surface text-text-primary"><div className="font-bold">Best fit: {allocResult.suggestion.label}</div><div className="text-sm text-text-muted">{allocResult.suggestion.section?.name ?? "Unsectioned"} · seats {allocResult.suggestion.minCapacity}–{allocResult.suggestion.maxCapacity}</div></div>
+              {allocResult.alternatives.length > 0 && <div className="text-sm text-text-secondary"><span className="font-bold text-text-primary">Alternatives: </span>{allocResult.alternatives.map((a) => a.label).join(", ")}</div>}
             </div>
-          ) : <p className="text-muted font-medium">No available table fits a party of {allocParty}. Consider the waitlist.</p>)}
+          ) : <p className="text-text-muted font-medium">No available table fits a party of {allocParty}. Consider the waitlist.</p>)}
         </div>
       )}
 
@@ -198,7 +198,7 @@ export default function TablesPage() {
         <div className="page-surface p-5 max-w-lg space-y-4">
           <FormField label="Cleaning timer (min)"><input type="number" className={inputClass} value={cfg.cleaningTimerMin} onChange={(e) => setCfg({ ...cfg, cleaningTimerMin: Number(e.target.value) })} /></FormField>
           {([["autoTransition", "Auto-transition cleaning → available"], ["allowWithoutQr", "Allow session without QR scan"], ["requireGuestCount", "Require guest count to open session"]] as const).map(([k, label]) => (
-            <label key={k} className="flex justify-between font-bold"><span>{label}</span><input type="checkbox" checked={cfg[k]} onChange={(e) => setCfg({ ...cfg, [k]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label key={k} className="flex justify-between font-bold text-text-primary"><span>{label}</span><input type="checkbox" checked={cfg[k]} onChange={(e) => setCfg({ ...cfg, [k]: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           ))}
           <BtnPrimary onClick={saveCfg}><Save size={18} /> Save Settings</BtnPrimary>
         </div>
@@ -217,8 +217,8 @@ export default function TablesPage() {
           <FormField label="Status"><select className={selectClass} value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{["available", "occupied", "reserved", "cleaning"].map((s) => <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>)}</select></FormField>
         </div>
         {!creating && detail && (
-          <div className="p-4 bg-cream rounded-xl border-2 border-border">
-            <h3 className="font-bold mb-3">Table Session</h3>
+          <div className="p-4 bg-surface-2 rounded-xl border border-border text-text-primary">
+            <h3 className="font-bold mb-3 text-text-primary">Table Session</h3>
             {detail.sessions[0] ? (
               <div className="space-y-2">
                 <p className="text-sm font-semibold">{detail.sessions[0].guestCount} guests{detail.sessions[0].guestName && ` · ${detail.sessions[0].guestName}`} · {formatCurrency(detail.sessions[0].orderTotal)}</p>

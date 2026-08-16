@@ -14,12 +14,12 @@ export function TodaysHighlights({
   operationsStatus = "All Clear",
 }: TodaysHighlightsProps) {
   return (
-    <div className="bg-white border border-border/80 rounded-2xl p-4 shadow-2xs space-y-2.5">
-      <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted">
-        Today's Highlights
+    <div className="h-full bg-surface-1 border border-border rounded-2xl p-4 shadow-2xs flex flex-col text-text-primary">
+      <div className="text-[11px] font-extrabold uppercase tracking-wider text-text-muted">
+        Today&apos;s Highlights
       </div>
 
-      <div className="grid grid-cols-3 gap-2 divide-x divide-border/40 text-left pt-0.5">
+      <div className="flex-1 grid grid-cols-3 gap-2 divide-x divide-border/40 text-left content-center mt-3">
         {/* Highlight 1: Peak Period */}
         <div className="space-y-1 pr-1">
           <div className="flex items-center gap-1.5 text-amber-600">
