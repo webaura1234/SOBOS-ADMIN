@@ -85,11 +85,11 @@ function ShellInner({ children }: { children: React.ReactNode }) {
   useInterval(loadOps, 30000);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
       <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-auto p-5 lg:p-6 pb-24 lg:pb-6 scrollbar-thin bg-white">
+        <main className="flex-1 min-h-0 overflow-y-auto p-5 lg:p-6 pb-24 lg:pb-6 scrollbar-thin bg-background">
           {children}
         </main>
       </div>

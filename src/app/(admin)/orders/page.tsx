@@ -290,11 +290,11 @@ function OrdersPageContent() {
             type="button"
             onClick={() => setLiveMode((v) => !v)}
             className={cn(
-              "inline-flex items-center gap-2 h-10 px-4 rounded-xl border-2 font-bold text-sm focus-ring",
-              liveMode ? "border-primary bg-primary/20 text-black" : "border-border bg-white text-muted"
+              "inline-flex items-center gap-2 h-10 px-4 rounded-xl border font-bold text-sm focus-ring transition-colors",
+              liveMode ? "border-yellow bg-yellow-surface text-text-primary" : "border-border bg-surface-2 text-text-muted hover:bg-surface-3 hover:text-text-primary"
             )}
           >
-            <Radio size={16} className={liveMode ? "text-green-600" : ""} />
+            <Radio size={16} className={liveMode ? "text-yellow" : ""} />
             {liveMode ? "Live on" : "Live off"}
           </button>
         }
@@ -330,7 +330,7 @@ function OrdersPageContent() {
             }}
           />
 
-          <div className="flex items-center gap-2 mb-5 p-2.5 bg-white border-2 border-border rounded-xl">
+          <div className="flex items-center gap-2 mb-5 p-2.5 bg-surface-1 border border-border rounded-xl shadow-2xs">
             <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto scrollbar-thin flex-nowrap">
               <LabeledFilterSelect
                 id="order-status-filter"
@@ -362,8 +362,8 @@ function OrdersPageContent() {
               />
             </div>
 
-            <div className="flex items-center gap-2 shrink-0 pl-2 border-l-2 border-border">
-              <span className="inline-flex items-center h-10 px-3 rounded-xl bg-cream border-2 border-border text-sm font-bold text-black tabular-nums whitespace-nowrap">
+            <div className="flex items-center gap-2 shrink-0 pl-2 border-l border-border">
+              <span className="inline-flex items-center h-10 px-3 rounded-xl bg-surface-2 border border-border text-sm font-bold text-text-primary tabular-nums whitespace-nowrap">
                 {orders.length} order{orders.length !== 1 ? "s" : ""}
               </span>
 
@@ -371,7 +371,7 @@ function OrdersPageContent() {
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border-2 border-border bg-white text-sm font-bold text-muted hover:bg-cream hover:text-black focus-ring whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-border bg-surface-2 text-sm font-bold text-text-muted hover:bg-surface-3 hover:text-text-primary focus-ring whitespace-nowrap transition-colors"
                 >
                   <X size={16} /> Clear
                 </button>
@@ -393,55 +393,55 @@ function OrdersPageContent() {
       )}
 
       {tab === "config" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          <h3 className="font-bold text-black">Order types</h3>
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4 text-text-primary shadow-2xs">
+          <h3 className="font-bold text-text-primary">Order types</h3>
           {([["dineIn", "Dine-In"], ["takeaway", "Takeaway"], ["counter", "Counter"], ["qr", "QR Ordering"]] as const).map(([key, label]) => (
-            <label key={key} className="flex justify-between font-bold text-black"><span>{label}</span><input type="checkbox" checked={orderConfig[key]} onChange={(e) => setOrderConfig({ ...orderConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label key={key} className="flex justify-between font-bold text-text-primary"><span>{label}</span><input type="checkbox" checked={orderConfig[key]} onChange={(e) => setOrderConfig({ ...orderConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           ))}
-          <h3 className="font-bold text-black pt-2 border-t border-border">Modification & cancellation policy</h3>
+          <h3 className="font-bold text-text-primary pt-2 border-t border-border">Modification & cancellation policy</h3>
           {([["requireCancelReason", "Require cancellation reason"], ["allowCancelPreparing", "Allow cancel once Preparing (manager)"], ["cancelPreparingRestores", "Restore stock when Preparing order cancelled"]] as const).map(([key, label]) => (
-            <label key={key} className="flex justify-between font-bold text-black"><span>{label}</span><input type="checkbox" checked={orderConfig[key]} onChange={(e) => setOrderConfig({ ...orderConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label key={key} className="flex justify-between font-bold text-text-primary"><span>{label}</span><input type="checkbox" checked={orderConfig[key]} onChange={(e) => setOrderConfig({ ...orderConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           ))}
           <BtnPrimary onClick={() => saveOrderConfig("orderControls", orderConfig, "Order controls saved")}><Save size={18} /> Save Settings</BtnPrimary>
         </div>
       )}
 
       {tab === "statemachine" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-          <p className="text-sm text-muted font-medium">Automations for the order lifecycle. Invalid transitions are always rejected regardless of these settings.</p>
-          <label className="flex justify-between font-bold"><span>Auto-confirm new orders</span><input type="checkbox" checked={stateMachine.autoConfirm} onChange={(e) => setStateMachine({ ...stateMachine, autoConfirm: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-          <label className="flex justify-between font-bold items-center"><span>Auto-prepare delay (min, 0 = off)</span><input type="number" className="w-24 h-10 px-2 border-2 border-border rounded-lg" value={stateMachine.autoPrepareDelayMin} onChange={(e) => setStateMachine({ ...stateMachine, autoPrepareDelayMin: Number(e.target.value) })} /></label>
-          <label className="flex justify-between font-bold items-center"><span>Stale auto-cancel (min, 0 = off)</span><input type="number" className="w-24 h-10 px-2 border-2 border-border rounded-lg" value={stateMachine.staleAutoCancelMin} onChange={(e) => setStateMachine({ ...stateMachine, staleAutoCancelMin: Number(e.target.value) })} /></label>
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4 text-text-primary shadow-2xs">
+          <p className="text-sm text-text-muted font-medium">Automations for the order lifecycle. Invalid transitions are always rejected regardless of these settings.</p>
+          <label className="flex justify-between font-bold text-text-primary"><span>Auto-confirm new orders</span><input type="checkbox" checked={stateMachine.autoConfirm} onChange={(e) => setStateMachine({ ...stateMachine, autoConfirm: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+          <label className="flex justify-between font-bold items-center text-text-primary"><span>Auto-prepare delay (min, 0 = off)</span><input type="number" className="w-24 h-10 px-2 border border-border bg-surface-2 text-text-primary rounded-lg" value={stateMachine.autoPrepareDelayMin} onChange={(e) => setStateMachine({ ...stateMachine, autoPrepareDelayMin: Number(e.target.value) })} /></label>
+          <label className="flex justify-between font-bold items-center text-text-primary"><span>Stale auto-cancel (min, 0 = off)</span><input type="number" className="w-24 h-10 px-2 border border-border bg-surface-2 text-text-primary rounded-lg" value={stateMachine.staleAutoCancelMin} onChange={(e) => setStateMachine({ ...stateMachine, staleAutoCancelMin: Number(e.target.value) })} /></label>
           <BtnPrimary onClick={() => saveOrderConfig("stateMachine", stateMachine, "State machine saved")}><Save size={18} /> Save</BtnPrimary>
         </div>
       )}
 
       {tab === "qr" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4 text-text-primary shadow-2xs">
           {([["enabled", "QR ordering enabled"], ["requirePhone", "Require phone verification"], ["loyaltyPrompt", "Show loyalty prompt"], ["allowAnonymous", "Allow anonymous orders"], ["showEstWait", "Show estimated wait"]] as const).map(([key, label]) => (
-            <label key={key} className="flex justify-between font-bold"><span>{label}</span><input type="checkbox" checked={qrConfig[key]} onChange={(e) => setQrConfig({ ...qrConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label key={key} className="flex justify-between font-bold text-text-primary"><span>{label}</span><input type="checkbox" checked={qrConfig[key]} onChange={(e) => setQrConfig({ ...qrConfig, [key]: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           ))}
-          <label className="flex justify-between font-bold items-center"><span>Cart preservation (min)</span><input type="number" className="w-24 h-10 px-2 border-2 border-border rounded-lg" value={qrConfig.cartPreservationMin} onChange={(e) => setQrConfig({ ...qrConfig, cartPreservationMin: Number(e.target.value) })} /></label>
+          <label className="flex justify-between font-bold items-center text-text-primary"><span>Cart preservation (min)</span><input type="number" className="w-24 h-10 px-2 border border-border bg-surface-2 text-text-primary rounded-lg" value={qrConfig.cartPreservationMin} onChange={(e) => setQrConfig({ ...qrConfig, cartPreservationMin: Number(e.target.value) })} /></label>
           <BtnPrimary onClick={() => saveOrderConfig("qrOrdering", qrConfig, "QR ordering saved")}><Save size={18} /> Save</BtnPrimary>
         </div>
       )}
 
       {tab === "kds" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
-            <h3 className="font-bold text-black">KDS settings</h3>
-            <label className="flex justify-between font-bold"><span>KDS Enabled</span><input type="checkbox" checked={kdsConfig.enabled} onChange={(e) => setKdsConfig({ ...kdsConfig, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-            <label className="flex justify-between font-bold items-center"><span>Blue → Orange (min)</span><input type="number" className="w-20 border-2 border-border rounded-lg px-2 py-1" value={kdsConfig.blueOrange} onChange={(e) => setKdsConfig({ ...kdsConfig, blueOrange: Number(e.target.value) })} /></label>
-            <label className="flex justify-between font-bold items-center"><span>Orange → Red (min)</span><input type="number" className="w-20 border-2 border-border rounded-lg px-2 py-1" value={kdsConfig.orangeRed} onChange={(e) => setKdsConfig({ ...kdsConfig, orangeRed: Number(e.target.value) })} /></label>
-            <label className="flex justify-between font-bold"><span>Audio on red</span><input type="checkbox" checked={kdsConfig.audioOnRed} onChange={(e) => setKdsConfig({ ...kdsConfig, audioOnRed: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-            <label className="flex justify-between font-bold"><span>Station routing</span><input type="checkbox" checked={kdsConfig.stationRouting} onChange={(e) => setKdsConfig({ ...kdsConfig, stationRouting: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-            <label className="flex justify-between font-bold items-center"><span>Undo-bump window (sec)</span><input type="number" className="w-20 border-2 border-border rounded-lg px-2 py-1" value={kdsConfig.undoBumpSec} onChange={(e) => setKdsConfig({ ...kdsConfig, undoBumpSec: Number(e.target.value) })} /></label>
-            <BtnPrimary onClick={() => saveOrderConfig("kds", kdsConfig, "KDS settings saved")}><Save size={18} /> Save</BtnPrimary>
+          <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4">
+            <h3 className="font-bold text-text-primary">KDS settings</h3>
+            <label className="flex justify-between font-bold text-text-primary"><span>KDS Enabled</span><input type="checkbox" checked={kdsConfig.enabled} onChange={(e) => setKdsConfig({ ...kdsConfig, enabled: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+            <label className="flex justify-between font-bold items-center text-text-primary"><span>Blue → Orange (min)</span><input type="number" className="w-20 border border-border rounded-lg px-2 py-1 bg-surface-2" value={kdsConfig.blueOrange} onChange={(e) => setKdsConfig({ ...kdsConfig, blueOrange: Number(e.target.value) })} /></label>
+            <label className="flex justify-between font-bold items-center text-text-primary"><span>Orange → Red (min)</span><input type="number" className="w-20 border border-border rounded-lg px-2 py-1 bg-surface-2" value={kdsConfig.orangeRed} onChange={(e) => setKdsConfig({ ...kdsConfig, orangeRed: Number(e.target.value) })} /></label>
+            <label className="flex justify-between font-bold text-text-primary"><span>Audio on red</span><input type="checkbox" checked={kdsConfig.audioOnRed} onChange={(e) => setKdsConfig({ ...kdsConfig, audioOnRed: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+            <label className="flex justify-between font-bold text-text-primary"><span>Station routing</span><input type="checkbox" checked={kdsConfig.stationRouting} onChange={(e) => setKdsConfig({ ...kdsConfig, stationRouting: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+            <label className="flex justify-between font-bold items-center text-text-primary"><span>Undo-bump window (sec)</span><input type="number" className="w-20 border border-border rounded-lg px-2 py-1 bg-surface-2" value={kdsConfig.undoBumpSec} onChange={(e) => setKdsConfig({ ...kdsConfig, undoBumpSec: Number(e.target.value) })} /></label>
+            <BtnPrimary onClick={() => saveOrderConfig("kds", kdsConfig, "KDS settings saved")}><Save size={18} /> Save Settings</BtnPrimary>
           </div>
 
-          <div className="bg-white border-2 border-border rounded-xl p-5 space-y-3">
+          <div className="bg-surface-1 border border-border rounded-xl p-5 space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-black">Stations <span className="text-xs text-muted">(head-chef view: {stations.length} stations · {stationItems.length} items)</span></h3>
+              <h3 className="font-bold text-text-primary">Stations <span className="text-xs text-text-muted">(head-chef view: {stations.length} stations · {stationItems.length} items)</span></h3>
             </div>
             <div className="flex gap-2">
               <input className={inputClass} placeholder="New station (e.g. Tandoor)" value={newStation} onChange={(e) => setNewStation(e.target.value)} />
@@ -450,29 +450,29 @@ function OrdersPageContent() {
             {stations.map((st) => {
               const ids = (() => { try { return JSON.parse(st.itemIds) as string[]; } catch { return []; } })();
               return (
-                <div key={st.id} className="p-3 border-2 border-border rounded-xl bg-cream/40">
-                  <div className="flex items-center justify-between mb-2"><span className="font-bold">{st.name} <span className="text-xs text-muted">({ids.length} items)</span></span>
+                <div key={st.id} className="p-3 border border-border rounded-xl bg-surface-2">
+                  <div className="flex items-center justify-between mb-2"><span className="font-bold text-text-primary">{st.name} <span className="text-xs text-text-muted">({ids.length} items)</span></span>
                     <button type="button" onClick={() => deleteStation(st.id)} className="text-red-600 text-sm font-bold underline">Remove</button></div>
                   <div className="flex flex-wrap gap-1.5 max-h-32 overflow-auto">
                     {stationItems.map((it) => (
                       <button key={it.id} type="button" onClick={() => toggleStationItem(st, it.id)}
-                        className={cn("px-2 py-1 rounded-lg text-xs font-bold border-2", ids.includes(it.id) ? "bg-primary border-primary" : "border-border bg-white text-muted")}>{it.name}</button>
+                        className={cn("px-2 py-1 rounded-lg text-xs font-bold border", ids.includes(it.id) ? "bg-primary border-primary text-black" : "border-border bg-surface-3 text-text-muted")}>{it.name}</button>
                     ))}
                   </div>
                 </div>
               );
             })}
-            {stations.length === 0 && <p className="text-sm text-muted font-semibold">No stations. Unassigned items appear on all stations.</p>}
+            {stations.length === 0 && <p className="text-sm text-text-muted font-semibold">No stations. Unassigned items appear on all stations.</p>}
           </div>
         </div>
       )}
 
       {tab === "receipt" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-4">
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-4">
           <FormField label="Footer Text"><textarea className={`${inputClass} min-h-24`} value={receiptConfig.footerText} onChange={(e) => setReceiptConfig({ ...receiptConfig, footerText: e.target.value })} /></FormField>
-          <label className="flex justify-between font-bold"><span>Auto-print receipts</span><input type="checkbox" checked={receiptConfig.autoPrint} onChange={(e) => setReceiptConfig({ ...receiptConfig, autoPrint: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-          <label className="flex justify-between font-bold"><span>Show GSTIN/FSSAI</span><input type="checkbox" checked={receiptConfig.showGstin} onChange={(e) => setReceiptConfig({ ...receiptConfig, showGstin: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-          <label className="flex justify-between font-bold"><span>Feedback QR on receipt</span><input type="checkbox" checked={receiptConfig.feedbackQr} onChange={(e) => setReceiptConfig({ ...receiptConfig, feedbackQr: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <label className="flex justify-between font-bold text-text-primary"><span>Auto-print receipts</span><input type="checkbox" checked={receiptConfig.autoPrint} onChange={(e) => setReceiptConfig({ ...receiptConfig, autoPrint: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+          <label className="flex justify-between font-bold text-text-primary"><span>Show GSTIN/FSSAI</span><input type="checkbox" checked={receiptConfig.showGstin} onChange={(e) => setReceiptConfig({ ...receiptConfig, showGstin: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+          <label className="flex justify-between font-bold text-text-primary"><span>Feedback QR on receipt</span><input type="checkbox" checked={receiptConfig.feedbackQr} onChange={(e) => setReceiptConfig({ ...receiptConfig, feedbackQr: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           <FormField label="Thermal printer (per location)"><input className={inputClass} placeholder="Printer name / IP" value={receiptConfig.printerName} onChange={(e) => setReceiptConfig({ ...receiptConfig, printerName: e.target.value })} /></FormField>
           <BtnPrimary onClick={() => saveOrderConfig("receipt", receiptConfig, "Receipt config saved")}><Save size={18} /> Save</BtnPrimary>
         </div>
@@ -480,23 +480,23 @@ function OrdersPageContent() {
 
       <Drawer open={!!detail} onClose={() => setDetail(null)} title={detail?.number ?? ""}>
         {detail && (
-          <div className="space-y-4">
+          <div className="space-y-4 text-text-primary">
             <dl className="grid grid-cols-2 gap-3 text-sm">
-              <div><dt className="text-muted font-bold">Source</dt><dd><SourceBadge source={detail.source} /></dd></div>
-              <div><dt className="text-muted font-bold">Total</dt><dd className="font-bold">{formatCurrency(detail.total)}</dd></div>
-              <div><dt className="text-muted font-bold">Table</dt><dd className="font-bold">{detail.tableLabel ?? "—"}</dd></div>
-              <div><dt className="text-muted font-bold">Time</dt><dd className="font-bold">{format(new Date(detail.createdAt), "dd MMM HH:mm")}</dd></div>
+              <div><dt className="text-text-muted font-bold">Source</dt><dd><SourceBadge source={detail.source} /></dd></div>
+              <div><dt className="text-text-muted font-bold">Total</dt><dd className="font-bold">{formatCurrency(detail.total)}</dd></div>
+              <div><dt className="text-text-muted font-bold">Table</dt><dd className="font-bold">{detail.tableLabel ?? "—"}</dd></div>
+              <div><dt className="text-text-muted font-bold">Time</dt><dd className="font-bold">{format(new Date(detail.createdAt), "dd MMM HH:mm")}</dd></div>
             </dl>
-            <h3 className="font-bold">Items</h3>
+            <h3 className="font-bold text-text-primary">Items</h3>
             <ul className="space-y-2">{detail.items?.map((i) => {
               const itemStations = i.itemId ? stationsForItem(i.itemId) : [];
               const cancelled = i.status === "cancelled";
               return (
-                <li key={i.id} className={cn("flex justify-between items-center p-2 bg-cream rounded-lg font-medium", cancelled && "opacity-60")}>
+                <li key={i.id} className={cn("flex justify-between items-center p-2 bg-surface-2 border border-border rounded-lg font-medium", cancelled && "opacity-60")}>
                   <span className={cn("flex items-center gap-2", cancelled && "line-through")}>
                     {i.quantity}× {i.name}
                     {kdsConfig.stationRouting && itemStations.length > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-border font-bold">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 border border-border font-bold">
                         {itemStations.length === 1 ? itemStations[0].name : `${itemStations.length} stations`}
                       </span>
                     )}

@@ -12,14 +12,14 @@ function parseFilters(filters: string) {
 
 export async function GET(req: NextRequest) {
   const restaurantId = await getRestaurantId();
-  const module = req.nextUrl.searchParams.get("module");
-  if (!module) return NextResponse.json({ error: "module is required" }, { status: 400 });
+  const moduleParam = req.nextUrl.searchParams.get("module");
+  if (!moduleParam) return NextResponse.json({ error: "module is required" }, { status: 400 });
 
   const { data: views, error } = await db()
     .from("SavedView")
     .select("*")
     .eq("restaurantId", restaurantId)
-    .eq("module", module)
+    .eq("module", moduleParam)
     .order("isDefault", { ascending: false })
     .order("name", { ascending: true });
   if (error) sbError(error, "saved-views/GET");

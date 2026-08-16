@@ -318,7 +318,7 @@ export default function AnalyticsPage() {
           </div>
           <button
             onClick={loadAnalytics}
-            className="btn-secondary text-xs py-1 px-3 h-8 bg-white border-red-300 hover:bg-red-100"
+            className="btn-secondary text-xs py-1 px-3 h-8 bg-red-surface border border-[var(--border-critical)] text-red hover:bg-surface-3 transition-colors"
           >
             <RefreshCw size={13} />
             <span>Retry</span>

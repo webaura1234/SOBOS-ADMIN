@@ -65,50 +65,50 @@ export function CommandPalette() {
   }, {});
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] bg-black/40" onClick={() => setCommandPaletteOpen(false)}>
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border-2 border-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] bg-[var(--scrim)]" onClick={() => setCommandPaletteOpen(false)}>
+      <div className="w-full max-w-xl bg-surface-1 rounded-2xl shadow-2xl border border-border overflow-hidden text-text-primary" onClick={(e) => e.stopPropagation()}>
         <Command label="Command palette" shouldFilter={false}>
-          <div className="flex items-center gap-2 px-4 border-b-2 border-border">
-            <Search size={18} className="text-muted shrink-0" />
+          <div className="flex items-center gap-2 px-4 border-b border-border bg-surface-2">
+            <Search size={18} className="text-text-muted shrink-0" />
             <Command.Input
               value={search}
               onValueChange={setSearch}
               placeholder="Commands or search records…"
-              className="flex-1 h-14 bg-transparent text-base font-semibold outline-none"
+              className="flex-1 h-14 bg-transparent text-sm font-semibold outline-none text-text-primary placeholder:text-text-muted"
               autoFocus
             />
-            {loading && <Loader2 size={18} className="animate-spin text-muted shrink-0" />}
-            <kbd className="text-xs text-muted bg-cream px-2 py-1 rounded-lg font-bold border border-border">ESC</kbd>
+            {loading && <Loader2 size={18} className="animate-spin text-text-muted shrink-0" />}
+            <kbd className="text-xs text-text-muted bg-surface-3 px-2 py-1 rounded-lg font-bold border border-border">ESC</kbd>
           </div>
           <Command.List className="max-h-[min(420px,60vh)] overflow-auto p-2 scrollbar-thin">
             {search.trim().length >= 2 && results.length === 0 && filteredCommands.length === 0 && !loading && (
-              <Command.Empty className="py-8 text-center text-sm text-muted font-medium">No matches.</Command.Empty>
+              <Command.Empty className="py-8 text-center text-sm text-text-muted font-medium">No matches.</Command.Empty>
             )}
 
             {Object.entries(entityGroups).map(([group, items]) => (
-              <Command.Group key={group} heading={group} className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2">
+              <Command.Group key={group} heading={group} className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-text-muted [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2">
                 {items.map((item) => (
                   <Command.Item
                     key={`${item.type}-${item.id}`}
                     value={`${item.label} ${item.sublabel ?? ""}`}
                     onSelect={() => navigate(item.href)}
-                    className="flex flex-col gap-0.5 px-3 py-3 rounded-xl cursor-pointer aria-selected:bg-primary/20"
+                    className="flex flex-col gap-0.5 px-3 py-3 rounded-xl cursor-pointer aria-selected:bg-surface-2 hover:bg-surface-2 transition-colors"
                   >
-                    <span className="font-bold text-black">{item.label}</span>
-                    {item.sublabel && <span className="text-xs text-muted font-medium">{item.sublabel}</span>}
+                    <span className="font-bold text-text-primary">{item.label}</span>
+                    {item.sublabel && <span className="text-xs text-text-muted font-medium">{item.sublabel}</span>}
                   </Command.Item>
                 ))}
               </Command.Group>
             ))}
 
             {commandGroups.map((group) => (
-              <Command.Group key={group} heading={group} className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-muted [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2">
+              <Command.Group key={group} heading={group} className="[&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-text-muted [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2">
                 {filteredCommands.filter((c) => c.group === group).map((cmd) => (
                   <Command.Item
                     key={cmd.id}
                     value={cmd.label}
                     onSelect={() => navigate(cmd.href)}
-                    className="px-3 py-2.5 rounded-xl text-base font-semibold cursor-pointer aria-selected:bg-cream"
+                    className="px-3 py-2.5 rounded-xl text-sm font-semibold cursor-pointer aria-selected:bg-surface-2 hover:bg-surface-2 text-text-primary transition-colors"
                   >
                     {cmd.label}
                   </Command.Item>

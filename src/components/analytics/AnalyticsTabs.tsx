@@ -36,20 +36,20 @@ interface AnalyticsTabsProps {
 export function AnalyticsTabs({ activeTab, onTabChange }: AnalyticsTabsProps) {
   return (
     <div className="mb-6 overflow-x-auto scrollbar-thin pb-1">
-      <nav className="flex gap-1.5 p-1.5 bg-cream/30 border border-border/70 rounded-2xl min-w-max">
+      <nav className="flex gap-1.5 p-1.5 bg-surface-2 border border-border rounded-2xl min-w-max">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-200 ${
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all duration-150 ${
                 isActive
-                  ? "bg-yellow text-black shadow-xs ring-2 ring-yellow/40"
-                  : "text-muted hover:text-black hover:bg-white/80"
+                  ? "bg-yellow text-[var(--on-yellow)] shadow-xs"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-3"
               }`}
             >
-              <span className={isActive ? "text-black" : "text-sand-dark"}>
+              <span className={isActive ? "text-[var(--on-yellow)]" : "text-text-muted"}>
                 {tab.icon}
               </span>
               <span>{tab.label}</span>

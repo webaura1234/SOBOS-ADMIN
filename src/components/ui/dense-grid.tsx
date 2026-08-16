@@ -121,12 +121,12 @@ export function DenseGrid<T extends { id: string }>({
       onScroll={(e) => shouldVirtualize && setScrollTop(e.currentTarget.scrollTop)}
       style={shouldVirtualize ? { maxHeight: viewportHeight } : undefined}
     >
-      <div className="px-3 py-2 text-xs font-bold text-muted border-b border-border bg-white">
+      <div className="px-3 py-2 text-xs font-bold text-text-muted border-b border-border bg-surface-2">
         {shouldVirtualize ? `Optimized grid: showing ${visibleRange.start + 1}-${visibleRange.end} of ${data.length}. ` : ""}
         Use ↑/↓ or j/k to move, Enter to open{selectable ? ", Space to select" : ""}.
       </div>
       <table className="w-full border-collapse" style={{ fontSize: "var(--fs)" }}>
-        <thead className="sticky top-0 z-10 bg-cream/95 backdrop-blur-sm border-b-2 border-border">
+        <thead className="sticky top-0 z-10 bg-surface-2 border-b border-border">
           <tr role="row">
             {selectable && (
               <th className="grid-cell w-12 text-left" role="columnheader">
@@ -135,7 +135,7 @@ export function DenseGrid<T extends { id: string }>({
                   aria-label="Select all"
                   checked={selectedIds.size === data.length && data.length > 0}
                   onChange={onSelectAll}
-                  className="rounded w-5 h-5 accent-[#F4B315]"
+                  className="rounded w-5 h-5 accent-[#FED500]"
                 />
               </th>
             )}
@@ -145,9 +145,9 @@ export function DenseGrid<T extends { id: string }>({
                 role="columnheader"
                 aria-sort={sortKey === col.key ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
                 className={cn(
-                  "grid-cell font-bold text-black text-left whitespace-nowrap",
+                  "grid-cell font-bold text-text-muted text-xs uppercase tracking-wider text-left whitespace-nowrap",
                   col.align === "right" && "text-right",
-                  col.sortable && "cursor-pointer hover:text-primary select-none"
+                  col.sortable && "cursor-pointer hover:text-text-primary select-none"
                 )}
                 style={{ width: col.width }}
                 onClick={() => col.sortable && onSort?.(col.key)}
@@ -173,11 +173,11 @@ export function DenseGrid<T extends { id: string }>({
               aria-rowindex={idx + 1}
               aria-selected={selectedIds.has(row.id)}
               className={cn(
-                "group border-b border-border/80 transition-colors",
-                onRowClick && "cursor-pointer hover:bg-primary/10",
-                idx % 2 === 1 ? "bg-cream/25" : "bg-white",
-                activeIndex === idx && "bg-cream outline outline-2 outline-primary/50",
-                selectedIds.has(row.id) && "bg-primary/20"
+                "group border-b border-border transition-colors",
+                onRowClick && "cursor-pointer hover:bg-surface-3",
+                idx % 2 === 1 ? "bg-surface-2/40" : "bg-surface-1",
+                activeIndex === idx && "bg-surface-2 outline outline-1 outline-yellow z-10",
+                selectedIds.has(row.id) && "bg-yellow/10"
               )}
               onClick={() => {
                 setActiveIndex(idx);

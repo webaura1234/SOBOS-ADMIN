@@ -189,7 +189,7 @@ function InventoryPageContent() {
         <>
           <FilterBar search={search} onSearchChange={setSearch} />
           <div className="flex items-center gap-2 mb-4">
-            <button type="button" onClick={() => setLowStockOnly((v) => !v)} className={cn("h-10 px-4 rounded-xl border-2 text-sm font-bold focus-ring", lowStockOnly ? "border-red-400 bg-red-50 text-red-800" : "border-border bg-white text-black hover:bg-cream")}>Low stock only {lowStockOnly ? `(${visibleStock.length})` : ""}</button>
+            <button type="button" onClick={() => setLowStockOnly((v) => !v)} className={cn("h-10 px-4 rounded-xl border text-sm font-bold focus-ring transition-colors", lowStockOnly ? "border-[var(--border-critical)] bg-red-surface text-red" : "border-border bg-surface-2 text-text-primary hover:bg-surface-3")}>Low stock only {lowStockOnly ? `(${visibleStock.length})` : ""}</button>
           </div>
           <DenseGrid columns={stockColumns} data={visibleStock} selectable={false} onRowClick={openAdjust} />
         </>
@@ -305,8 +305,8 @@ function InventoryPageContent() {
             </div>
             <FormField label="Address"><textarea className={`${inputClass} min-h-16`} value={supplierDetail.address ?? ""} onChange={(e) => setSupplierDetail({ ...supplierDetail, address: e.target.value })} /></FormField>
             {!creatingSupplier && supplierDetail.purchaseOrders && supplierDetail.purchaseOrders.length > 0 && (
-              <div className="mt-3"><h3 className="font-bold mb-2">PO history</h3>
-                <ul className="space-y-1 text-sm">{supplierDetail.purchaseOrders.map((p) => <li key={p.id} className="flex justify-between p-2 bg-cream rounded-lg"><span>{p.number} · {p.status.replace(/_/g, " ")}</span><span className="font-bold">{formatCurrency(p.total)}</span></li>)}</ul>
+              <div className="mt-3"><h3 className="font-bold mb-2 text-text-primary">PO history</h3>
+                <ul className="space-y-1 text-sm">{supplierDetail.purchaseOrders.map((p) => <li key={p.id} className="flex justify-between p-2 bg-surface-2 border border-border rounded-lg text-text-primary"><span>{p.number} · {p.status.replace(/_/g, " ")}</span><span className="font-bold tabular-nums text-yellow">{formatCurrency(p.total)}</span></li>)}</ul>
               </div>
             )}
             <div className="flex gap-3 mt-4 pt-4 border-t border-border">
@@ -335,25 +335,25 @@ function InventoryPageContent() {
           <FormField label="Supplier"><select className={selectClass} value={poForm.supplierId} onChange={(e) => setPoForm({ ...poForm, supplierId: e.target.value })}>{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></FormField>
           <FormField label="Location"><select className={selectClass} value={poForm.locationId} onChange={(e) => setPoForm({ ...poForm, locationId: e.target.value })}>{poLocations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></FormField>
         </div>
-        <div className="flex items-center justify-between mb-2"><h3 className="font-bold">Line items</h3><BtnSecondary onClick={() => setPoForm({ ...poForm, lines: [...poForm.lines, { ingredientId: ingredients[0]?.id ?? "", qtyOrdered: 1, unitPrice: 0 }] })}><Plus size={16} /> Add line</BtnSecondary></div>
+        <div className="flex items-center justify-between mb-2"><h3 className="font-bold text-text-primary">Line items</h3><BtnSecondary onClick={() => setPoForm({ ...poForm, lines: [...poForm.lines, { ingredientId: ingredients[0]?.id ?? "", qtyOrdered: 1, unitPrice: 0 }] })}><Plus size={16} /> Add line</BtnSecondary></div>
         <div className="space-y-2">
           {poForm.lines.map((l, i) => (
             <div key={i} className="grid grid-cols-[1fr_80px_90px_40px] gap-2 items-center">
               <select className={selectClass} value={l.ingredientId} onChange={(e) => setPoForm({ ...poForm, lines: poForm.lines.map((x, idx) => idx === i ? { ...x, ingredientId: e.target.value } : x) })}>{ingredients.map((ing) => <option key={ing.id} value={ing.id}>{ing.name}</option>)}</select>
               <input type="number" className={inputClass} value={l.qtyOrdered} title="Qty" onChange={(e) => setPoForm({ ...poForm, lines: poForm.lines.map((x, idx) => idx === i ? { ...x, qtyOrdered: Number(e.target.value) } : x) })} />
               <input type="number" className={inputClass} value={l.unitPrice} title="Unit price" onChange={(e) => setPoForm({ ...poForm, lines: poForm.lines.map((x, idx) => idx === i ? { ...x, unitPrice: Number(e.target.value) } : x) })} />
-              <button type="button" onClick={() => setPoForm({ ...poForm, lines: poForm.lines.filter((_, idx) => idx !== i) })} className="h-12 rounded-xl border-2 border-border text-red-600 font-bold">×</button>
+              <button type="button" onClick={() => setPoForm({ ...poForm, lines: poForm.lines.filter((_, idx) => idx !== i) })} className="h-12 rounded-xl border border-border text-red font-bold">×</button>
             </div>
           ))}
         </div>
-        <p className="font-bold text-right mt-3">Total: {formatCurrency(poTotal)}</p>
+        <p className="font-bold text-right mt-3 text-text-primary">Total: {formatCurrency(poTotal)}</p>
         <BtnPrimary onClick={createPo} className="mt-2"><Save size={18} /> Submit PO</BtnPrimary>
       </Drawer>
 
       {/* ── PO detail / receive ── */}
       <Drawer open={!!poDetail} onClose={() => setPoDetail(null)} title={poDetail?.number ?? ""} width="640px">
         {poDetail && (
-          <div className="space-y-4">
+          <div className="space-y-4 text-text-primary">
             <div className="flex items-center justify-between">
               <StatusDot status={poDetail.status === "partially_received" ? "preparing" : poDetail.status} label={poDetail.status.replace(/_/g, " ")} />
               <BtnSecondary onClick={() => { exportCsv(`${poDetail.number}.csv`, ["Ingredient", "Ordered", "Received", "Unit Price"], poDetail.lines.map((l) => [l.ingredient.name, l.qtyOrdered, l.qtyReceived, l.unitPrice])); toast("PO exported"); }}>Export</BtnSecondary>
@@ -362,8 +362,8 @@ function InventoryPageContent() {
               {poDetail.lines.map((l) => {
                 const open = poDetail.status !== "received" && poDetail.status !== "cancelled";
                 return (
-                  <div key={l.id} className="p-3 bg-cream rounded-xl">
-                    <div className="flex justify-between font-bold"><span>{l.ingredient.name}</span><span>{l.qtyReceived}/{l.qtyOrdered} {l.ingredient.unit}</span></div>
+                  <div key={l.id} className="p-3 bg-surface-2 border border-border rounded-xl text-text-primary">
+                    <div className="flex justify-between font-bold text-text-primary"><span>{l.ingredient.name}</span><span>{l.qtyReceived}/{l.qtyOrdered} {l.ingredient.unit}</span></div>
                     {open && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <label className="text-xs font-bold">Receive qty<input type="number" className={inputClass} value={receiveLines[l.id]?.receiveQty ?? 0} onChange={(e) => setReceiveLines({ ...receiveLines, [l.id]: { ...receiveLines[l.id], receiveQty: Number(e.target.value) } })} /></label>
@@ -398,6 +398,19 @@ function InventoryPageContent() {
       </Drawer>
 
       <ConfirmDialog open={!!cancelPo} title="Cancel purchase order?" message="Only non-received POs can be cancelled." confirmLabel="Cancel PO" destructive onConfirm={doCancelPo} onCancel={() => setCancelPo(null)} />
+
+      {/* Drawers & modals */}
+      <Drawer open={!!adjust} onClose={() => setAdjust(null)} title={`Adjust Stock: ${adjust?.ingredient.name}`}>
+        {adjust && (
+          <div className="space-y-4 text-text-primary">
+            <p className="text-sm text-text-muted">Current total stock: <b>{adjust.quantity} {adjust.ingredient.unit}</b></p>
+            <FormField label="Adjustment quantity"><input type="number" step="0.1" className={inputClass} value={adjustForm.value} onChange={(e) => setAdjustForm({ ...adjustForm, value: Number(e.target.value) })} placeholder="0" /></FormField>
+            <FormField label="Reason"><select className={selectClass} value={adjustForm.reason} onChange={(e) => setAdjustForm({ ...adjustForm, reason: e.target.value })}>{ADJUST_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}</select></FormField>
+            <FormField label="Notes"><input className={inputClass} value={adjustForm.note} onChange={(e) => setAdjustForm({ ...adjustForm, note: e.target.value })} placeholder="Audit note" /></FormField>
+            <BtnPrimary onClick={saveAdjust}><Save size={18} /> Apply Adjustment</BtnPrimary>
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
@@ -407,13 +420,13 @@ function AlertRow({ ing, onSave }: { ing: AlertIngredient; onSave: (ing: AlertIn
   const [channels, setChannels] = useState<string[]>(parseJson(ing.alertChannels));
   const breached = ing.totalStock <= threshold;
   return (
-    <div className={cn("flex flex-wrap items-center gap-3 p-3 rounded-xl border-2", breached ? "border-red-300 bg-red-50" : "border-border bg-white")}>
+    <div className={cn("flex flex-wrap items-center gap-3 p-3 rounded-xl border text-text-primary shadow-2xs", breached ? "border-[var(--border-critical)] bg-red-surface text-red" : "border-border bg-surface-1")}>
       <span className="font-bold min-w-[140px]">{ing.name}</span>
-      <span className="text-sm text-muted">In stock: <b className="tabular-nums">{ing.totalStock} {ing.unit}</b></span>
-      <label className="text-sm font-bold flex items-center gap-2">Threshold<input type="number" className="w-24 h-9 px-2 border-2 border-border rounded-lg" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} /></label>
+      <span className="text-sm text-text-muted">In stock: <b className="tabular-nums text-text-primary">{ing.totalStock} {ing.unit}</b></span>
+      <label className="text-sm font-bold flex items-center gap-2 text-text-primary">Threshold<input type="number" className="w-24 h-9 px-2 border border-border bg-surface-2 text-text-primary rounded-lg" value={threshold} onChange={(e) => setThreshold(Number(e.target.value))} /></label>
       <div className="flex gap-1.5">{CHANNELS.map((c) => (
         <button key={c} type="button" onClick={() => setChannels(channels.includes(c) ? channels.filter((x) => x !== c) : [...channels, c])}
-          className={cn("px-2.5 py-1 rounded-lg text-xs font-bold border-2 capitalize", channels.includes(c) ? "bg-primary border-primary" : "border-border bg-white text-muted")}>{c.replace("_", "-")}</button>
+          className={cn("px-2.5 py-1 rounded-lg text-xs font-bold border capitalize transition-colors", channels.includes(c) ? "bg-yellow border-yellow text-[var(--on-yellow)]" : "border-border bg-surface-2 text-text-muted hover:text-text-primary")}>{c.replace("_", "-")}</button>
       ))}</div>
       <BtnSecondary onClick={() => onSave(ing, threshold, channels)} className="ml-auto"><Save size={14} /> Save</BtnSecondary>
     </div>
@@ -432,7 +445,7 @@ function TrendChart({ ing }: { ing?: TrendIngredient }) {
         <span className={cn("text-sm font-bold", Math.abs(change) > 10 ? "text-red-600" : "text-muted")}>{change >= 0 ? "▲" : "▼"} {Math.abs(change).toFixed(1)}% {Math.abs(change) > 10 && "⚠ spike"}</span>
       </div>
       <ChartContainer height={240}>
-        <LineChart data={data}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip formatter={(v) => formatCurrency(Number(v))} /><Line type="monotone" dataKey="price" stroke="#F4B315" strokeWidth={3} dot /></LineChart>
+        <LineChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" /><XAxis dataKey="date" tick={{ fontSize: 11, fill: "#B8AA96" }} /><YAxis tick={{ fontSize: 11, fill: "#B8AA96" }} /><Tooltip contentStyle={{ backgroundColor: "#101010", borderRadius: "10px", border: "1px solid #2A2A2A", color: "#F5F1E8" }} formatter={(v) => formatCurrency(Number(v))} /><Line type="monotone" dataKey="price" stroke="#FED500" strokeWidth={3} dot={{ r: 4, fill: "#FED500", stroke: "#0A0A0A" }} /></LineChart>
       </ChartContainer>
     </div>
   );

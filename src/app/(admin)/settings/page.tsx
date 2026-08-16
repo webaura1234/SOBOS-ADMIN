@@ -113,14 +113,14 @@ function SettingsPageContent() {
       <TabBar tabs={[{ id: "profile", label: "Profile" }, { id: "locations", label: "Locations" }, { id: "hours", label: "Operating Hours" }, { id: "roles", label: "Roles" }, { id: "assignments", label: "Assignments" }, { id: "features", label: "Feature Toggles" }]} active={tab} onChange={setTab} />
 
       {tab === "profile" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-2xl space-y-1">
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-2xl space-y-1 text-text-primary shadow-2xs">
           <div className="grid grid-cols-2 gap-3">
             <FormField label="Name"><input className={inputClass} value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} /></FormField>
             <FormField label="Tagline" hint="≤150 chars"><input className={inputClass} maxLength={150} value={profile.tagline} onChange={(e) => setProfile({ ...profile, tagline: e.target.value })} /></FormField>
           </div>
           <FormField label="Description" hint="≤1000 chars"><textarea className={`${inputClass} min-h-24`} maxLength={1000} value={profile.description} onChange={(e) => setProfile({ ...profile, description: e.target.value })} /></FormField>
           <FormField label="Logo URL" hint="JPEG/PNG"><input className={inputClass} value={profile.logoUrl} onChange={(e) => setProfile({ ...profile, logoUrl: e.target.value })} /></FormField>
-          {profile.logoUrl && <img src={profile.logoUrl} alt="logo" className="h-16 w-16 rounded-xl object-cover border-2 border-border mb-3" />}
+          {profile.logoUrl && <img src={profile.logoUrl} alt="logo" className="h-16 w-16 rounded-xl object-cover border border-border mb-3" />}
           <FormField label="Cuisine tags" hint="Comma-separated"><input className={inputClass} value={profile.cuisineTags} onChange={(e) => setProfile({ ...profile, cuisineTags: e.target.value })} /></FormField>
           <div className="grid grid-cols-2 gap-3">
             <FormField label="FSSAI (14-digit)"><input className={inputClass} value={profile.fssai} onChange={(e) => setProfile({ ...profile, fssai: e.target.value })} /></FormField>
@@ -138,7 +138,7 @@ function SettingsPageContent() {
             const draft = locationDrafts[loc.id] ?? { name: loc.name, address: loc.address, city: loc.city, pin: loc.pin, phone: loc.phone ?? "", email: loc.email ?? "", taxSlab: loc.taxSlab, status: loc.status };
             const set = (patch: Partial<typeof draft>) => setLocationDrafts({ ...locationDrafts, [loc.id]: { ...draft, ...patch } });
             return (
-              <div key={loc.id} className="bg-white border-2 border-border rounded-xl p-5">
+              <div key={loc.id} className="bg-surface-1 border border-border rounded-xl p-5 text-text-primary shadow-2xs">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <FormField label="Name"><input className={inputClass} value={draft.name} onChange={(e) => set({ name: e.target.value })} /></FormField>
                   <FormField label="City"><input className={inputClass} value={draft.city} onChange={(e) => set({ city: e.target.value })} /></FormField>
@@ -153,8 +153,8 @@ function SettingsPageContent() {
               </div>
             );
           })}
-          <div className="bg-cream border-2 border-border rounded-xl p-5">
-            <h3 className="font-bold text-lg mb-3">Add Location</h3>
+          <div className="bg-surface-2 border border-border rounded-xl p-5 text-text-primary">
+            <h3 className="font-bold text-lg mb-3 text-text-primary">Add Location</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <FormField label="Name"><input className={inputClass} value={newLocation.name} onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })} /></FormField>
               <FormField label="Address"><input className={inputClass} value={newLocation.address} onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })} /></FormField>
@@ -173,29 +173,29 @@ function SettingsPageContent() {
           {DAYS.map((day, d) => {
             const rows = hoursLocation.operatingHours.filter((h) => h.dayOfWeek === d);
             return (
-              <div key={d} className="bg-white border-2 border-border rounded-xl p-4">
-                <div className="flex items-center justify-between mb-2"><span className="font-bold w-12">{day}</span><button type="button" onClick={() => addShift(d)} className="text-sm font-bold underline">+ Split shift</button></div>
-                {rows.length === 0 && <p className="text-sm text-muted">No hours set</p>}
+              <div key={d} className="bg-surface-1 border border-border rounded-xl p-4 text-text-primary shadow-2xs">
+                <div className="flex items-center justify-between mb-2"><span className="font-bold w-12 text-text-primary">{day}</span><button type="button" onClick={() => addShift(d)} className="text-sm font-bold underline text-yellow">+ Split shift</button></div>
+                {rows.length === 0 && <p className="text-sm text-text-muted">No hours set</p>}
                 {rows.map((h) => (
                   <div key={h.id} className="flex items-center gap-3 mb-2">
-                    <label className="flex items-center gap-1.5 text-sm font-bold"><input type="checkbox" checked={h.isClosed} onChange={(e) => saveHours(h.id, { isClosed: e.target.checked })} className="w-4 h-4 accent-[#F4B315]" /> Closed</label>
+                    <label className="flex items-center gap-1.5 text-sm font-bold text-text-primary"><input type="checkbox" checked={h.isClosed} onChange={(e) => saveHours(h.id, { isClosed: e.target.checked })} className="w-4 h-4 accent-[#FED500]" /> Closed</label>
                     <input type="time" disabled={h.isClosed} className={inputClass + " w-32 disabled:opacity-40"} defaultValue={h.openTime} onBlur={(e) => saveHours(h.id, { openTime: e.target.value })} />
-                    <span>–</span>
+                    <span className="text-text-muted">–</span>
                     <input type="time" disabled={h.isClosed} className={inputClass + " w-32 disabled:opacity-40"} defaultValue={h.closeTime} onBlur={(e) => saveHours(h.id, { closeTime: e.target.value })} />
-                    {rows.length > 1 && <button type="button" onClick={() => removeShift(h.id)} className="text-red-600 font-bold">×</button>}
+                    {rows.length > 1 && <button type="button" onClick={() => removeShift(h.id)} className="text-red font-bold">×</button>}
                   </div>
                 ))}
               </div>
             );
           })}
-          <div className="bg-white border-2 border-border rounded-xl p-4">
-            <h3 className="font-bold mb-3">Holiday closures &amp; special hours</h3>
+          <div className="bg-surface-1 border border-border rounded-xl p-4 text-text-primary shadow-2xs">
+            <h3 className="font-bold mb-3 text-text-primary">Holiday closures &amp; special hours</h3>
             <div className="flex gap-2 items-end mb-3">
               <FormField label="Date"><input type="date" className={inputClass} value={holidayForm.date} onChange={(e) => setHolidayForm({ ...holidayForm, date: e.target.value })} /></FormField>
               <FormField label="Name"><input className={inputClass} value={holidayForm.name} onChange={(e) => setHolidayForm({ ...holidayForm, name: e.target.value })} placeholder="Diwali" /></FormField>
               <BtnSecondary onClick={addHoliday} className="mb-5"><Plus size={16} /> Add</BtnSecondary>
             </div>
-            <ul className="space-y-1">{locHolidays.map((h) => <li key={h.id} className="flex justify-between p-2 bg-cream rounded-lg text-sm"><span className="font-bold">{format(new Date(h.date), "dd MMM yyyy")} — {h.name}</span><button type="button" onClick={() => removeHoliday(h.id)} className="text-red-600 font-bold underline">Remove</button></li>)}{locHolidays.length === 0 && <li className="text-sm text-muted">No holidays set</li>}</ul>
+            <ul className="space-y-1">{locHolidays.map((h) => <li key={h.id} className="flex justify-between p-2 bg-surface-2 border border-border rounded-lg text-sm text-text-primary"><span className="font-bold">{format(new Date(h.date), "dd MMM yyyy")} — {h.name}</span><button type="button" onClick={() => removeHoliday(h.id)} className="text-red font-bold underline">Remove</button></li>)}{locHolidays.length === 0 && <li className="text-sm text-text-muted">No holidays set</li>}</ul>
           </div>
         </div>
       )}
@@ -204,33 +204,33 @@ function SettingsPageContent() {
         <div className="space-y-4">
           {templates.length > 0 && (
             <div className="page-surface p-4">
-              <h3 className="font-bold mb-2">Template gallery</h3>
+              <h3 className="font-bold mb-2 text-text-primary">Template gallery</h3>
               <div className="flex flex-wrap gap-2">{templates.map((t) => (
-                <button key={t.id} type="button" onClick={() => applyTemplate(t)} className="px-3 py-2 rounded-xl border-2 border-border bg-white hover:border-primary text-left focus-ring"><div className="font-bold text-sm">{t.name}</div><div className="text-xs text-muted">{t._count.permissions} perms · use as base</div></button>
+                <button key={t.id} type="button" onClick={() => applyTemplate(t)} className="px-3 py-2 rounded-xl border border-border bg-surface-2 hover:border-yellow text-left focus-ring transition-colors"><div className="font-bold text-sm text-text-primary">{t.name}</div><div className="text-xs text-text-muted">{t._count.permissions} perms · use as base</div></button>
               ))}</div>
             </div>
           )}
           <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-4">
-            <div className="bg-white border-2 border-border rounded-xl p-4">
-              <div className="flex items-center justify-between gap-2 mb-3"><h3 className="font-bold text-lg">Roles</h3><BtnSecondary onClick={cloneRole}><Copy size={16} /> Clone</BtnSecondary></div>
-              <button type="button" onClick={() => { setSelectedRoleId("__new__"); setRoleDraft({ name: "New Role", description: "", permissionIds: [], creating: true }); }} className="w-full mb-3 h-10 rounded-xl border-2 border-border bg-cream font-bold flex items-center justify-center gap-2 focus-ring"><Plus size={16} /> New Role</button>
+            <div className="bg-surface-1 border border-border rounded-xl p-4 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 mb-3"><h3 className="font-bold text-lg text-text-primary">Roles</h3><BtnSecondary onClick={cloneRole}><Copy size={16} /> Clone</BtnSecondary></div>
+              <button type="button" onClick={() => { setSelectedRoleId("__new__"); setRoleDraft({ name: "New Role", description: "", permissionIds: [], creating: true }); }} className="w-full mb-3 h-10 rounded-xl border border-border bg-surface-2 text-text-primary font-bold flex items-center justify-center gap-2 focus-ring hover:bg-surface-3 transition-colors"><Plus size={16} /> New Role</button>
               {data.roles.map((role) => (
-                <button key={role.id} type="button" onClick={() => selectRole(role.id)} className={`w-full text-left p-3 rounded-xl border-2 mb-2 focus-ring ${selectedRoleId === role.id ? "border-primary bg-primary/15" : "border-border bg-white hover:bg-cream"}`}>
-                  <div className="font-bold flex items-center gap-1.5">{role.name}{role.isTemplate && <span className="text-[10px] px-1.5 py-0.5 rounded bg-cream border border-border">template</span>}</div>
-                  <div className="text-xs font-semibold text-muted">{role._count.assignments} staff · {role._count.permissions} permissions</div>
+                <button key={role.id} type="button" onClick={() => selectRole(role.id)} className={`w-full text-left p-3 rounded-xl border mb-2 focus-ring transition-colors ${selectedRoleId === role.id ? "border-yellow bg-yellow-surface text-text-primary" : "border-border bg-surface-2 hover:bg-surface-3 text-text-primary"}`}>
+                  <div className="font-bold flex items-center gap-1.5">{role.name}{role.isTemplate && <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-3 border border-border text-text-secondary">template</span>}</div>
+                  <div className="text-xs font-semibold text-text-muted">{role._count.assignments} staff · {role._count.permissions} permissions</div>
                 </button>
               ))}
             </div>
-            <div className="bg-white border-2 border-border rounded-xl p-5">
+            <div className="bg-surface-1 border border-border rounded-xl p-5 text-text-primary shadow-2xs">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
                 <FormField label="Role Name"><input className={inputClass} value={roleDraft.name} onChange={(e) => setRoleDraft({ ...roleDraft, name: e.target.value })} /></FormField>
                 <FormField label="Description"><input className={inputClass} value={roleDraft.description} onChange={(e) => setRoleDraft({ ...roleDraft, description: e.target.value })} /></FormField>
               </div>
               {Object.entries(data.permissions.reduce<Record<string, Permission[]>>((acc, p) => { (acc[p.group] ??= []).push(p); return acc; }, {})).map(([group, perms]) => (
                 <div key={group} className="mb-5">
-                  <h4 className="text-sm font-bold uppercase tracking-wide text-muted mb-2">{group}</h4>
+                  <h4 className="text-xs font-extrabold uppercase tracking-wide text-text-muted mb-2">{group}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{perms.map((p) => (
-                    <label key={p.id} className="flex items-start gap-3 p-3 rounded-xl border-2 border-border bg-cream/40 font-bold"><input type="checkbox" checked={roleDraft.permissionIds.includes(p.id)} onChange={() => togglePermission(p.id)} className="w-5 h-5 mt-0.5 accent-[#F4B315]" /><span><span className="block text-black">{p.label}</span><span className="block text-xs text-muted">{p.resource}.{p.action}</span></span></label>
+                    <label key={p.id} className="flex items-start gap-3 p-3 rounded-xl border border-border bg-surface-2 font-bold text-text-primary"><input type="checkbox" checked={roleDraft.permissionIds.includes(p.id)} onChange={() => togglePermission(p.id)} className="w-5 h-5 mt-0.5 accent-[#FED500]" /><span><span className="block text-text-primary">{p.label}</span><span className="block text-xs text-text-muted">{p.resource}.{p.action}</span></span></label>
                   ))}</div>
                 </div>
               ))}
@@ -241,22 +241,22 @@ function SettingsPageContent() {
       )}
 
       {tab === "assignments" && (
-        <div className="space-y-4 max-w-3xl">
-          <div className="page-surface p-4">
-            <h3 className="font-bold mb-3">Assign a role</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-              <FormField label="User"><select className={selectClass} value={assignForm.userId} onChange={(e) => setAssignForm({ ...assignForm, userId: e.target.value })}><option value="">— user —</option>{data.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></FormField>
-              <FormField label="Role"><select className={selectClass} value={assignForm.roleId} onChange={(e) => setAssignForm({ ...assignForm, roleId: e.target.value })}><option value="">— role —</option>{data.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></FormField>
+        <div className="space-y-4">
+          <div className="page-surface p-5 max-w-2xl">
+            <h3 className="font-bold mb-3 text-text-primary">Assign Role to Staff</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <FormField label="Staff"><select className={selectClass} value={assignForm.userId} onChange={(e) => setAssignForm({ ...assignForm, userId: e.target.value })}>{data.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></FormField>
+              <FormField label="Role"><select className={selectClass} value={assignForm.roleId} onChange={(e) => setAssignForm({ ...assignForm, roleId: e.target.value })}>{data.roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></FormField>
               <FormField label="Location"><select className={selectClass} value={assignForm.locationId} onChange={(e) => setAssignForm({ ...assignForm, locationId: e.target.value })}><option value="">All locations</option>{data.locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></FormField>
               <BtnPrimary onClick={addAssignment} className="mb-5"><Plus size={18} /> Assign</BtnPrimary>
             </div>
           </div>
           {data.users.map((u) => (
-            <div key={u.id} className="bg-white border-2 border-border rounded-xl p-4">
-              <div className="font-bold mb-2">{u.name}</div>
-              {u.locationRoles.length === 0 ? <p className="text-sm text-muted">No locations assigned</p> : (
+            <div key={u.id} className="bg-surface-1 border border-border rounded-xl p-4 text-text-primary shadow-2xs">
+              <div className="font-bold mb-2 text-text-primary">{u.name}</div>
+              {u.locationRoles.length === 0 ? <p className="text-sm text-text-muted">No locations assigned</p> : (
                 <div className="flex flex-wrap gap-2">{u.locationRoles.map((lr) => (
-                  <span key={lr.id} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-cream border-2 border-border text-sm font-bold">{lr.role.name} @ {lr.location?.name ?? "All Locations"}<button type="button" onClick={() => removeAssignment(lr.id)} className="text-red-600">×</button></span>
+                  <span key={lr.id} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-2 border border-border text-sm font-bold text-text-primary">{lr.role.name} @ {lr.location?.name ?? "All Locations"}<button type="button" onClick={() => removeAssignment(lr.id)} className="text-red font-bold">×</button></span>
                 ))}</div>
               )}
             </div>
@@ -265,15 +265,15 @@ function SettingsPageContent() {
       )}
 
       {tab === "features" && Object.entries(groupedToggles).map(([group, toggles]) => (
-        <div key={group} className="bg-white border-2 border-border rounded-xl p-5 mb-4">
-          <h3 className="font-bold mb-3">{group}</h3>
+        <div key={group} className="bg-surface-1 border border-border rounded-xl p-5 mb-4 text-text-primary shadow-2xs">
+          <h3 className="font-bold mb-3 text-text-primary">{group}</h3>
           {toggles.map((t) => {
             const dep = FEATURE_DEPS[t.key];
             const depOff = dep && !data.toggles.find((x) => x.key === dep)?.enabled;
             return (
-              <label key={t.id} className="flex justify-between items-center py-2 font-bold capitalize">
-                <span className="flex items-center gap-2">{t.key.replace(/_/g, " ")}{dep && <span className="text-xs font-medium text-muted inline-flex items-center gap-1"><Lock size={11} /> needs {dep.replace(/_/g, " ")}</span>}</span>
-                <input type="checkbox" checked={t.enabled} disabled={!t.enabled && !!depOff} onChange={(e) => toggleFeature(t.id, t.key, e.target.checked)} className={cn("w-5 h-5 accent-[#F4B315]", !t.enabled && depOff && "opacity-40")} />
+              <label key={t.id} className="flex justify-between items-center py-2 font-bold capitalize text-text-primary">
+                <span className="flex items-center gap-2">{t.key.replace(/_/g, " ")}{dep && <span className="text-xs font-medium text-text-muted inline-flex items-center gap-1"><Lock size={11} /> needs {dep.replace(/_/g, " ")}</span>}</span>
+                <input type="checkbox" checked={t.enabled} disabled={!t.enabled && !!depOff} onChange={(e) => toggleFeature(t.id, t.key, e.target.checked)} className={cn("w-5 h-5 accent-[#FED500]", !t.enabled && depOff && "opacity-40")} />
               </label>
             );
           })}

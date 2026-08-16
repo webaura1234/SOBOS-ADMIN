@@ -153,11 +153,11 @@ export default function CustomersPage() {
       {tab === "segments" && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {SEG_DEFS.map((s) => (
-            <button key={s.key} type="button" onClick={() => setSegDrill(s.key)} className="p-5 bg-white border-2 border-border rounded-xl text-left hover:border-primary focus-ring">
-              <div className="font-bold text-lg">{s.label}</div>
-              <div className="text-muted text-xs">{s.desc}</div>
-              <div className="text-3xl font-bold mt-2 tabular-nums">{segments.counts[s.key] ?? 0}</div>
-              <div className="text-xs font-bold text-primary mt-2">View &amp; campaign →</div>
+            <button key={s.key} type="button" onClick={() => setSegDrill(s.key)} className="p-5 bg-surface-1 border border-border rounded-2xl text-left hover:border-yellow focus-ring transition-colors shadow-2xs">
+              <div className="font-bold text-lg text-text-primary">{s.label}</div>
+              <div className="text-text-muted text-xs font-medium">{s.desc}</div>
+              <div className="text-3xl font-extrabold mt-2 tabular-nums text-text-primary">{segments.counts[s.key] ?? 0}</div>
+              <div className="text-xs font-bold text-yellow mt-2">View &amp; campaign →</div>
             </button>
           ))}
         </div>
@@ -178,8 +178,8 @@ export default function CustomersPage() {
       {tab === "reservations" && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex gap-1 p-1 bg-cream rounded-xl border-2 border-border">
-              {(["day", "week", "list"] as const).map((v) => <button key={v} type="button" onClick={() => setResView(v)} className={cn("px-3 py-1.5 rounded-lg text-sm font-bold capitalize", resView === v ? "bg-white shadow border-2 border-primary" : "text-muted")}>{v}</button>)}
+            <div className="flex gap-1 p-1 bg-surface-2 rounded-xl border border-border">
+              {(["day", "week", "list"] as const).map((v) => <button key={v} type="button" onClick={() => setResView(v)} className={cn("px-3 py-1.5 rounded-lg text-sm font-bold capitalize transition-colors", resView === v ? "bg-surface-3 shadow border border-border text-yellow" : "text-text-muted")}>{v}</button>)}
             </div>
             <input type="date" className={inputClass + " max-w-[180px]"} value={resDate} onChange={(e) => setResDate(e.target.value)} />
             <BtnPrimary onClick={() => { setResForm({ guestName: "", guestPhone: "", partySize: 2, dateTime: `${resDate}T19:00`, specialRequests: "" }); setShowRes(true); }}><Plus size={18} /> New Reservation</BtnPrimary>
@@ -187,18 +187,18 @@ export default function CustomersPage() {
 
           {resView === "day" && (
             <div className="page-surface p-4">
-              <h3 className="font-bold mb-3">{format(new Date(resDate), "EEEE, dd MMM yyyy")} · {dayReservations.length} bookings</h3>
-              {dayReservations.length === 0 ? <p className="text-muted font-medium py-6 text-center">No reservations</p> : (
+              <h3 className="font-bold mb-3 text-text-primary">{format(new Date(resDate), "EEEE, dd MMM yyyy")} · {dayReservations.length} bookings</h3>
+              {dayReservations.length === 0 ? <p className="text-text-muted font-medium py-6 text-center">No reservations</p> : (
                 <ul className="space-y-2">{dayReservations.map((r) => (
-                  <li key={r.id} className="flex items-center justify-between gap-3 p-3 border-2 border-border rounded-xl">
+                  <li key={r.id} className="flex items-center justify-between gap-3 p-3 border border-border rounded-xl bg-surface-2 text-text-primary">
                     <div className="flex items-center gap-3">
-                      <span className="font-bold tabular-nums w-16">{format(new Date(r.dateTime), "HH:mm")}</span>
-                      <div><div className="font-bold">{r.guestName} · {r.partySize}p {r.table && <span className="text-muted">· {r.table.label}</span>}</div>
-                        {r.specialRequests && <div className="text-xs text-muted">{r.specialRequests}</div>}</div>
+                      <span className="font-bold tabular-nums w-16 text-yellow">{format(new Date(r.dateTime), "HH:mm")}</span>
+                      <div><div className="font-bold text-text-primary">{r.guestName} · {r.partySize}p {r.table && <span className="text-text-muted">· {r.table.label}</span>}</div>
+                        {r.specialRequests && <div className="text-xs text-text-muted">{r.specialRequests}</div>}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={() => setWhyRes(r)} className={cn("px-2 py-1 rounded-lg text-xs font-bold border-2", r.noShowScore >= resCfg.noShowThreshold ? "border-red-300 bg-red-50 text-red-700" : "border-border")}>No-show {r.noShowScore}{r.noShowScore >= resCfg.noShowThreshold && " ⚠"}</button>
-                      <button type="button" onClick={() => cancelRes(r.id)} className="text-red-600 text-sm font-bold underline">Cancel</button>
+                      <button type="button" onClick={() => setWhyRes(r)} className={cn("px-2 py-1 rounded-lg text-xs font-bold border", r.noShowScore >= resCfg.noShowThreshold ? "border-[var(--border-critical)] bg-red-surface text-red" : "border-border text-text-muted")}>No-show {r.noShowScore}{r.noShowScore >= resCfg.noShowThreshold && " ⚠"}</button>
+                      <button type="button" onClick={() => cancelRes(r.id)} className="text-red text-sm font-bold underline">Cancel</button>
                     </div>
                   </li>
                 ))}</ul>
@@ -209,10 +209,10 @@ export default function CustomersPage() {
           {resView === "week" && (
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
               {weekDays.map((d) => { const count = reservations.filter((r) => r.dateTime.slice(0, 10) === d && r.status !== "cancelled").length; return (
-                <button key={d} type="button" onClick={() => { setResDate(d); setResView("day"); }} className={cn("p-3 rounded-xl border-2 text-left focus-ring", d === resDate ? "border-primary bg-primary/10" : "border-border bg-white hover:bg-cream")}>
-                  <div className="text-xs font-bold text-muted">{format(new Date(d), "EEE")}</div>
-                  <div className="font-bold">{format(new Date(d), "dd")}</div>
-                  <div className="text-2xl font-bold tabular-nums">{count}</div>
+                <button key={d} type="button" onClick={() => { setResDate(d); setResView("day"); }} className={cn("p-3 rounded-xl border text-left focus-ring transition-colors", d === resDate ? "border-yellow bg-yellow-surface text-text-primary" : "border-border bg-surface-1 hover:bg-surface-2 text-text-primary")}>
+                  <div className="text-xs font-bold text-text-muted">{format(new Date(d), "EEE")}</div>
+                  <div className="font-bold text-text-primary">{format(new Date(d), "dd")}</div>
+                  <div className="text-2xl font-extrabold tabular-nums text-text-primary">{count}</div>
                 </button>
               ); })}
             </div>
@@ -224,15 +224,15 @@ export default function CustomersPage() {
               { key: "party", header: "Party", align: "right", render: (r: Reservation) => r.partySize },
               { key: "date", header: "When", render: (r: Reservation) => format(new Date(r.dateTime), "dd MMM HH:mm") },
               { key: "status", header: "Status", render: (r: Reservation) => <StatusDot status={r.status === "confirmed" ? "confirmed" : r.status === "cancelled" ? "cancelled" : "pending"} label={r.status} /> },
-              { key: "score", header: "No-Show", align: "right", render: (r: Reservation) => <button type="button" onClick={(e) => { e.stopPropagation(); setWhyRes(r); }} className={cn("font-bold", r.noShowScore >= resCfg.noShowThreshold && "text-red-600")}>{r.noShowScore}</button> },
+              { key: "score", header: "No-Show", align: "right", render: (r: Reservation) => <button type="button" onClick={(e) => { e.stopPropagation(); setWhyRes(r); }} className={cn("font-bold", r.noShowScore >= resCfg.noShowThreshold && "text-red")}>{r.noShowScore}</button> },
             ]} data={reservations.map((r) => ({ ...r }))} selectable={false} onRowClick={() => {}} />
           )}
 
           <div className="page-surface p-5">
-            <h3 className="font-bold mb-3">Reservation settings</h3>
+            <h3 className="font-bold mb-3 text-text-primary">Reservation settings</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <label className="flex items-center justify-between font-bold text-sm col-span-2"><span>Enable reservations</span><input type="checkbox" checked={resCfg.enabled} onChange={(e) => setResCfg({ ...resCfg, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-              <label className="flex items-center justify-between font-bold text-sm col-span-2"><span>Online booking</span><input type="checkbox" checked={resCfg.onlineBooking} onChange={(e) => setResCfg({ ...resCfg, onlineBooking: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+              <label className="flex items-center justify-between font-bold text-sm col-span-2 text-text-primary"><span>Enable reservations</span><input type="checkbox" checked={resCfg.enabled} onChange={(e) => setResCfg({ ...resCfg, enabled: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+              <label className="flex items-center justify-between font-bold text-sm col-span-2 text-text-primary"><span>Online booking</span><input type="checkbox" checked={resCfg.onlineBooking} onChange={(e) => setResCfg({ ...resCfg, onlineBooking: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
               <FormField label="Slot granularity (min)"><input type="number" className={inputClass} value={resCfg.slotGranularity} onChange={(e) => setResCfg({ ...resCfg, slotGranularity: Number(e.target.value) })} /></FormField>
               <FormField label="Max party"><input type="number" className={inputClass} value={resCfg.maxParty} onChange={(e) => setResCfg({ ...resCfg, maxParty: Number(e.target.value) })} /></FormField>
               <FormField label="No-show threshold"><input type="number" className={inputClass} value={resCfg.noShowThreshold} onChange={(e) => setResCfg({ ...resCfg, noShowThreshold: Number(e.target.value) })} /></FormField>
@@ -254,9 +254,9 @@ export default function CustomersPage() {
             { key: "status", header: "Status", render: (r: Waitlist) => <StatusDot status={r.status === "waiting" ? "pending" : r.status === "notified" ? "confirmed" : "completed"} label={r.status} /> },
             { key: "act", header: "Action", render: (r: Waitlist) => (
               <span className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                {r.status === "waiting" && <button type="button" onClick={() => waitAction(r.id, "notified")} className="font-bold underline">Notify</button>}
-                <button type="button" onClick={() => waitAction(r.id, "seated")} className="font-bold underline">Seat</button>
-                <button type="button" onClick={() => waitAction(r.id, "no_show")} className="font-bold underline text-red-600">No-show</button>
+                {r.status === "waiting" && <button type="button" onClick={() => waitAction(r.id, "notified")} className="font-bold underline text-yellow">Notify</button>}
+                <button type="button" onClick={() => waitAction(r.id, "seated")} className="font-bold underline text-text-primary">Seat</button>
+                <button type="button" onClick={() => waitAction(r.id, "no_show")} className="font-bold underline text-red">No-show</button>
               </span>
             ) },
           ]} data={waitlist} selectable={false} onRowClick={() => {}} emptyMessage="Waitlist is empty" />
@@ -265,19 +265,19 @@ export default function CustomersPage() {
 
       {tab === "loyalty" && loyalty && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-4xl">
-          <div className="bg-white border-2 border-border rounded-xl p-5 space-y-1">
-            <h3 className="font-bold mb-2">Earn & redeem</h3>
-            <label className="flex justify-between font-bold mb-3"><span>Program enabled</span><input type="checkbox" checked={loyalty.enabled} onChange={(e) => setLoyalty({ ...loyalty, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+          <div className="bg-surface-1 border border-border rounded-xl p-5 space-y-1 text-text-primary shadow-2xs">
+            <h3 className="font-bold mb-2 text-text-primary">Earn & redeem</h3>
+            <label className="flex justify-between font-bold mb-3 text-text-primary"><span>Program enabled</span><input type="checkbox" checked={loyalty.enabled} onChange={(e) => setLoyalty({ ...loyalty, enabled: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
             <FormField label="Earn rate (pts/₹)"><input type="number" step="0.1" className={inputClass} value={loyalty.earnRate} onChange={(e) => setLoyalty({ ...loyalty, earnRate: Number(e.target.value) })} /></FormField>
             <FormField label="Redeem rate (₹/pt)"><input type="number" step="0.01" className={inputClass} value={loyalty.redeemRate} onChange={(e) => setLoyalty({ ...loyalty, redeemRate: Number(e.target.value) })} /></FormField>
             <FormField label="Min redeem (pts)"><input type="number" className={inputClass} value={loyalty.minRedeem} onChange={(e) => setLoyalty({ ...loyalty, minRedeem: Number(e.target.value) })} /></FormField>
             <FormField label="Max discount per bill (%)"><input type="number" className={inputClass} value={loyalty.maxDiscountPct} onChange={(e) => setLoyalty({ ...loyalty, maxDiscountPct: Number(e.target.value) })} /></FormField>
             <FormField label="Points expiry (months)"><input type="number" className={inputClass} value={loyalty.expiryMonths} onChange={(e) => setLoyalty({ ...loyalty, expiryMonths: Number(e.target.value) })} /></FormField>
-            <label className="flex justify-between font-bold"><span>Award points on aggregator orders</span><input type="checkbox" checked={loyalty.awardOnAggregator} onChange={(e) => setLoyalty({ ...loyalty, awardOnAggregator: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+            <label className="flex justify-between font-bold text-text-primary"><span>Award points on aggregator orders</span><input type="checkbox" checked={loyalty.awardOnAggregator} onChange={(e) => setLoyalty({ ...loyalty, awardOnAggregator: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
           </div>
-          <div className="bg-white border-2 border-border rounded-xl p-5 space-y-1">
-            <h3 className="font-bold mb-2">Tiers</h3>
-            <p className="text-sm text-muted mb-3">Silver is the base tier. Gold &amp; Platinum unlock at cumulative spend with a points multiplier.</p>
+          <div className="bg-surface-1 border border-border rounded-xl p-5 space-y-1 text-text-primary shadow-2xs">
+            <h3 className="font-bold mb-2 text-text-primary">Tiers</h3>
+            <p className="text-sm text-text-muted mb-3">Silver is the base tier. Gold &amp; Platinum unlock at cumulative spend with a points multiplier.</p>
             <FormField label="Gold threshold (₹ cumulative)"><input type="number" className={inputClass} value={loyalty.goldThreshold} onChange={(e) => setLoyalty({ ...loyalty, goldThreshold: Number(e.target.value) })} /></FormField>
             <FormField label="Gold multiplier"><input type="number" step="0.1" className={inputClass} value={loyalty.goldMultiplier} onChange={(e) => setLoyalty({ ...loyalty, goldMultiplier: Number(e.target.value) })} /></FormField>
             <FormField label="Platinum threshold (₹ cumulative)"><input type="number" className={inputClass} value={loyalty.platinumThreshold} onChange={(e) => setLoyalty({ ...loyalty, platinumThreshold: Number(e.target.value) })} /></FormField>
@@ -297,9 +297,9 @@ export default function CustomersPage() {
       )}
 
       {tab === "referral" && (
-        <div className="bg-white border-2 border-border rounded-xl p-5 max-w-lg space-y-1">
-          <label className="flex justify-between font-bold mb-3"><span>Referral program enabled</span><input type="checkbox" checked={referral.enabled} onChange={(e) => setReferral({ ...referral, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
-          <p className="text-sm text-muted mb-2">Requires loyalty program. One level only (no MLM).</p>
+        <div className="bg-surface-1 border border-border rounded-xl p-5 max-w-lg space-y-1 text-text-primary shadow-2xs">
+          <label className="flex justify-between font-bold mb-3 text-text-primary"><span>Referral program enabled</span><input type="checkbox" checked={referral.enabled} onChange={(e) => setReferral({ ...referral, enabled: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
+          <p className="text-sm text-text-muted mb-2">Requires loyalty program. One level only (no MLM).</p>
           <FormField label="Referrer reward (₹/pts)"><input type="number" className={inputClass} value={referral.referrerReward} onChange={(e) => setReferral({ ...referral, referrerReward: Number(e.target.value) })} /></FormField>
           <FormField label="Referee reward (₹/pts)"><input type="number" className={inputClass} value={referral.refereeReward} onChange={(e) => setReferral({ ...referral, refereeReward: Number(e.target.value) })} /></FormField>
           <FormField label="Max referrals / month"><input type="number" className={inputClass} value={referral.maxPerMonth} onChange={(e) => setReferral({ ...referral, maxPerMonth: Number(e.target.value) })} /></FormField>
@@ -311,9 +311,8 @@ export default function CustomersPage() {
       {/* ── Customer profile drawer (guest recall card) ── */}
       <Drawer open={creating || !!detail} onClose={() => { setCreating(false); setDetail(null); }} title={creating ? "New Customer" : detail?.name ?? ""} width="560px">
         {!creating && detail && (
-          <div className="mb-4 p-4 bg-cream rounded-xl border-2 border-border">
+          <div className="mb-4 p-4 bg-surface-2 rounded-xl border border-border">
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div><div className="text-2xl font-bold tabular-nums">{detail.visitCount}</div><div className="text-xs text-muted font-bold">Visits</div></div>
               <div><div className="text-2xl font-bold tabular-nums">{formatCurrency(detail.totalSpend)}</div><div className="text-xs text-muted font-bold">Total spend</div></div>
               <div><div className="text-2xl font-bold tabular-nums">{detail.points}</div><div className="text-xs text-muted font-bold">Points</div></div>
             </div>
@@ -332,7 +331,7 @@ export default function CustomersPage() {
         <FormField label="Tags" hint="Comma-separated"><input className={inputClass} value={form.tags.join(", ")} onChange={(e) => setForm({ ...form, tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} /></FormField>
         <FormField label="Dietary / allergy notes"><textarea className={`${inputClass} min-h-16`} value={form.dietaryNotes} onChange={(e) => setForm({ ...form, dietaryNotes: e.target.value })} /></FormField>
         <FormField label="Service notes (staff)"><textarea className={`${inputClass} min-h-16`} value={form.serviceNotes} onChange={(e) => setForm({ ...form, serviceNotes: e.target.value })} /></FormField>
-        <label className="flex justify-between font-bold mb-4"><span>Opted out of marketing</span><input type="checkbox" checked={form.optedOut} onChange={(e) => setForm({ ...form, optedOut: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+        <label className="flex justify-between font-bold mb-4"><span>Opted out of marketing</span><input type="checkbox" checked={form.optedOut} onChange={(e) => setForm({ ...form, optedOut: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
         <div className="flex gap-3">
           <BtnPrimary onClick={saveCustomer}><Save size={18} /> Save</BtnPrimary>
           {!creating && detail && <BtnSecondary onClick={() => setConfirmDelete(detail.id)}><Trash2 size={18} /> Delete</BtnSecondary>}
@@ -348,7 +347,7 @@ export default function CustomersPage() {
               <BtnPrimary onClick={() => { openCampaign(SEG_LABEL[segDrill]); setSegDrill(null); }}><Plus size={16} /> Campaign to segment</BtnPrimary>
             </div>
             <ul className="space-y-2">{(segments.members[segDrill] ?? []).map((c) => (
-              <li key={c.id} className="flex justify-between p-3 bg-cream rounded-lg"><span className="font-bold">{c.name}</span><span className="text-muted">{formatCurrency(c.totalSpend)} · {c.visitCount} visits</span></li>
+              <li key={c.id} className="flex justify-between p-3 bg-surface-2 border border-border rounded-lg text-text-primary"><span className="font-bold">{c.name}</span><span className="text-text-muted">{formatCurrency(c.totalSpend)} · {c.visitCount} visits</span></li>
             ))}</ul>
           </>
         )}
@@ -383,13 +382,13 @@ export default function CustomersPage() {
       {/* ── No-show why panel ── */}
       <Drawer open={!!whyRes} onClose={() => setWhyRes(null)} title="Why this no-show score?">
         {whyRes && (
-          <div className="space-y-4">
-            <div className={cn("p-4 rounded-xl text-center", whyRes.noShowScore >= resCfg.noShowThreshold ? "bg-red-50 border-2 border-red-200" : "bg-cream")}>
-              <div className="text-4xl font-bold tabular-nums">{whyRes.noShowScore}</div>
-              <div className="font-bold flex items-center justify-center gap-1">{whyRes.noShowScore >= resCfg.noShowThreshold && <AlertTriangle size={16} className="text-red-600" />}{whyRes.noShowScore >= resCfg.noShowThreshold ? "High risk" : "Acceptable risk"}</div>
+          <div className="space-y-4 text-text-primary">
+            <div className={cn("p-4 rounded-xl text-center border", whyRes.noShowScore >= resCfg.noShowThreshold ? "bg-red-surface border-[var(--border-critical)] text-red" : "bg-surface-2 border-border text-text-primary")}>
+              <div className="text-4xl font-extrabold tabular-nums">{whyRes.noShowScore}</div>
+              <div className="font-bold flex items-center justify-center gap-1">{whyRes.noShowScore >= resCfg.noShowThreshold && <AlertTriangle size={16} className="text-red" />}{whyRes.noShowScore >= resCfg.noShowThreshold ? "High risk" : "Acceptable risk"}</div>
             </div>
-            <div><h3 className="font-bold mb-2">Contributing factors</h3>
-              <ul className="space-y-1">{whyFactors(whyRes).map((f) => <li key={f.label} className="flex justify-between text-sm p-2 bg-cream rounded-lg"><span className="text-muted font-medium">{f.label}</span><span className="font-bold">{f.value}</span></li>)}</ul>
+            <div><h3 className="font-bold mb-2 text-text-primary">Contributing factors</h3>
+              <ul className="space-y-1">{whyFactors(whyRes).map((f) => <li key={f.label} className="flex justify-between text-sm p-2 bg-surface-2 border border-border rounded-lg text-text-primary"><span className="text-text-muted font-medium">{f.label}</span><span className="font-bold">{f.value}</span></li>)}</ul>
             </div>
             {whyRes.noShowScore >= resCfg.noShowThreshold && (
               <div><h3 className="font-bold mb-2">Recommended actions</h3>
@@ -426,16 +425,16 @@ function OfferCard({ kind, offer, onSave }: { kind: string; offer: AutoOffer; on
   const [o, setO] = useState<AutoOffer>(offer);
   useEffect(() => { setO(offer); }, [offer]);
   return (
-    <div className="bg-white border-2 border-border rounded-xl p-5 space-y-1">
-      <div className="flex items-center justify-between mb-2"><h3 className="font-bold capitalize flex items-center gap-2"><Star size={16} className="text-amber-500" /> {kind} offer</h3>
-        <input type="checkbox" checked={o.enabled} onChange={(e) => setO({ ...o, enabled: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></div>
+    <div className="bg-surface-1 border border-border rounded-xl p-5 space-y-1 text-text-primary shadow-2xs">
+      <div className="flex items-center justify-between mb-2"><h3 className="font-bold capitalize flex items-center gap-2 text-text-primary"><Star size={16} className="text-yellow" /> {kind} offer</h3>
+        <input type="checkbox" checked={o.enabled} onChange={(e) => setO({ ...o, enabled: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></div>
       <div className="grid grid-cols-2 gap-3">
         <FormField label="Days before"><input type="number" className={inputClass} value={o.daysBefore} onChange={(e) => setO({ ...o, daysBefore: Number(e.target.value) })} /></FormField>
         <FormField label="Offer type"><select className={selectClass} value={o.offerType} onChange={(e) => setO({ ...o, offerType: e.target.value })}><option value="percent">% off</option><option value="free_item">Free item</option><option value="bonus_points">Bonus points</option></select></FormField>
         <FormField label="Value"><input type="number" className={inputClass} value={o.value} onChange={(e) => setO({ ...o, value: Number(e.target.value) })} /></FormField>
         <FormField label="Validity (days)"><input type="number" className={inputClass} value={o.validityDays} onChange={(e) => setO({ ...o, validityDays: Number(e.target.value) })} /></FormField>
         <FormField label="Channel"><select className={selectClass} value={o.channel} onChange={(e) => setO({ ...o, channel: e.target.value })}><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option></select></FormField>
-        <label className="flex items-center justify-between font-bold text-sm pt-6"><span>Skip lapsed</span><input type="checkbox" checked={o.skipLapsed} onChange={(e) => setO({ ...o, skipLapsed: e.target.checked })} className="w-5 h-5 accent-[#F4B315]" /></label>
+        <label className="flex items-center justify-between font-bold text-sm pt-6 text-text-primary"><span>Skip lapsed</span><input type="checkbox" checked={o.skipLapsed} onChange={(e) => setO({ ...o, skipLapsed: e.target.checked })} className="w-5 h-5 accent-[#FED500]" /></label>
       </div>
       <BtnPrimary onClick={() => onSave(o)} className="mt-2"><Save size={16} /> Save</BtnPrimary>
     </div>

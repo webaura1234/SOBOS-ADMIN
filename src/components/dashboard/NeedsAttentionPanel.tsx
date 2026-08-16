@@ -1,113 +1,161 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, X, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { AlertTriangle, ArrowRight, X } from "lucide-react";
 
+export interface AttentionItem {
+  id: string;
+  severity: "critical" | "warning";
+  /** How many underlying problems this row represents — the badge sums these. */
+  count: number;
+  title: string;
+  detail?: string;
+  href: string;
+  /** Computed conditions clear themselves; only Alert rows can be dismissed by hand. */
+  dismissible?: boolean;
+}
+
+/** Retained for the /api/dashboard PATCH contract on Alert rows. */
 export interface AlertItem {
   id: string;
   title: string;
   message: string;
-  severity: string; // 'critical' | 'warning' | 'info'
+  severity: string;
   isRead: boolean;
 }
 
 interface NeedsAttentionPanelProps {
-  alerts: AlertItem[];
+  attention: AttentionItem[];
   onDismiss: (id: string) => void;
+  loading?: boolean;
 }
 
-export function NeedsAttentionPanel({
-  alerts,
-  onDismiss,
-}: NeedsAttentionPanelProps) {
-  const unreadAlerts = alerts.filter((a) => !a.isRead);
+const MAX_VISIBLE = 4;
 
-  // ADAPTIVE STATUS COMPONENT — 0 ISSUES CLEAR SURFACE
-  if (unreadAlerts.length === 0) {
+export function NeedsAttentionPanel({ attention, onDismiss, loading = false }: NeedsAttentionPanelProps) {
+  const criticalCount = attention.filter((a) => a.severity === "critical").length;
+  // Sum the underlying problems, not the number of rules that matched.
+  const issueCount = attention.reduce((sum, a) => sum + (a.count ?? 1), 0);
+  const visible = attention.slice(0, MAX_VISIBLE);
+  const hidden = attention.length - visible.length;
+  const worst = criticalCount > 0 ? "critical" : "warning";
+
+  if (loading) {
     return (
-      <div className="mb-6 p-4 rounded-2xl border border-border/80 bg-white shadow-2xs flex items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-xl bg-cream border border-border/60 text-black flex items-center justify-center font-extrabold shrink-0">
-            ✓
-          </div>
-          <div>
-            <div className="font-extrabold text-black uppercase tracking-wider text-xs">
-              ALL OPERATIONS CLEAR
-            </div>
-            <div className="text-muted font-medium text-xs mt-0.5">
-              No active operational issues requiring immediate action.
-            </div>
-          </div>
-        </div>
-
-        <span className="px-2.5 py-1 rounded-full bg-cream border border-border text-[11px] font-extrabold text-black shrink-0">
-          0 ISSUES
-        </span>
-      </div>
+      <section className="h-full rounded-[18px] border border-border bg-surface-1 p-5 space-y-3">
+        <div className="h-5 w-40 rounded-md bg-surface-3" />
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-12 rounded-md bg-surface-3" />
+        ))}
+      </section>
     );
   }
 
   return (
-    <div className="mb-6 space-y-2">
-      <div className="flex items-center justify-between text-[11px] font-extrabold uppercase tracking-wider text-muted">
-        <span>⚠ Needs Attention</span>
-        <span className="text-black font-extrabold">{unreadAlerts.length} ISSUES</span>
+    <section
+      className={cn(
+        "h-full rounded-[18px] border flex flex-col overflow-hidden",
+        worst === "critical" ? "border-[var(--border-critical)]" : "border-[var(--border-warning)]"
+      )}
+      style={{
+        backgroundColor: "var(--surface-1)",
+        backgroundImage: worst === "critical" ? "var(--red-panel-gradient)" : "linear-gradient(180deg, #1D1509 0%, #0F0F0F 100%)",
+      }}
+      aria-label="Needs attention"
+      aria-live="polite"
+    >
+      <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-3">
+        <h2 className="text-[16px] font-semibold leading-6 text-text-primary flex items-center gap-2">
+          <AlertTriangle
+            size={17}
+            className={worst === "critical" ? "text-critical" : "text-warning"}
+            aria-hidden="true"
+          />
+          Needs attention
+        </h2>
+        <span
+          className={cn(
+            "text-[12px] font-semibold tabular-nums",
+            worst === "critical" ? "text-critical" : "text-warning"
+          )}
+        >
+          {issueCount} {issueCount === 1 ? "issue" : "issues"}
+        </span>
       </div>
 
-      <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs divide-y divide-border/50">
-        {unreadAlerts.map((item) => {
-          let dotColor = "bg-amber-500";
-          let actionHref = "/orders";
-
-          if (item.severity === "critical" || item.title.toLowerCase().includes("stock")) {
-            dotColor = "bg-red-600";
-            actionHref = "/inventory?filter=low";
-          } else if (item.severity === "warning" || item.title.toLowerCase().includes("kds")) {
-            dotColor = "bg-amber-500";
-            actionHref = "/orders";
-          } else if (item.title.toLowerCase().includes("payment") || item.title.toLowerCase().includes("refund")) {
-            dotColor = "bg-sand-dark";
-            actionHref = "/payments";
-          }
-
+      <div className="flex-1 px-6 pb-3">
+        {visible.map((item) => {
+          const isCritical = item.severity === "critical";
           return (
-            <div
-              key={item.id}
-              className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <span className={`w-2.5 h-2.5 rounded-full ${dotColor} shrink-0`} />
-                <div className="min-w-0">
-                  <div className="font-extrabold text-black uppercase tracking-wider text-[11px]">
-                    {item.title}
-                  </div>
-                  <div className="text-muted font-medium text-xs truncate">
-                    {item.message}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                <Link
-                  href={actionHref}
-                  className="font-bold text-xs text-black hover:text-yellow-hover flex items-center gap-1 transition-colors"
+            <div key={item.id} className="flex items-center gap-2 border-t border-border/60 first:border-t-0">
+              <Link
+                href={item.href}
+                className="group flex items-center gap-3 flex-1 min-w-0 py-2.5 -mx-2 px-2 rounded-[10px] hover:bg-surface-3 transition-colors focus-ring"
+              >
+                {/* Fixed-width number column so the counts align vertically */}
+                <span
+                  className={cn(
+                    "w-10 shrink-0 text-right text-[28px] leading-8 font-semibold tabular-nums",
+                    isCritical ? "text-critical" : "text-warning"
+                  )}
                 >
-                  <span>Resolve →</span>
-                </Link>
+                  {item.count}
+                </span>
 
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] leading-5 text-text-primary group-hover:text-yellow transition-colors">
+                    {item.title}
+                  </span>
+                  {item.detail && (
+                    <span className="block text-[12px] leading-4 text-text-muted truncate">
+                      {item.detail}
+                    </span>
+                  )}
+                </span>
+
+                {/* Severity in text as well as colour — never colour alone */}
+                <span
+                  className={cn(
+                    "shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] px-2 py-0.5 rounded-md border",
+                    isCritical
+                      ? "text-critical border-[var(--border-critical)] bg-[var(--critical-surface)]"
+                      : "text-warning border-[var(--border-warning)] bg-[var(--warning-surface)]"
+                  )}
+                >
+                  {isCritical ? "Critical" : "Warning"}
+                </span>
+
+                <ArrowRight
+                  size={15}
+                  className="shrink-0 text-text-muted group-hover:text-text-primary transition-colors"
+                  aria-hidden="true"
+                />
+              </Link>
+
+              {item.dismissible && (
                 <button
                   type="button"
                   onClick={() => onDismiss(item.id)}
-                  title="Dismiss alert"
-                  className="p-1 rounded-lg text-muted hover:text-black hover:bg-cream transition-colors"
+                  aria-label={`Dismiss ${item.title}`}
+                  className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-3 transition-colors shrink-0 focus-ring"
                 >
                   <X size={14} />
                 </button>
-              </div>
+              )}
             </div>
           );
         })}
+
+        {hidden > 0 && (
+          <Link
+            href="/orders"
+            className="block border-t border-border/60 py-2.5 text-[12px] font-semibold text-text-secondary hover:text-yellow transition-colors focus-ring"
+          >
+            +{hidden} more
+          </Link>
+        )}
       </div>
-    </div>
+    </section>
   );
 }

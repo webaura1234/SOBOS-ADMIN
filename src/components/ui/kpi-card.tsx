@@ -21,7 +21,7 @@ function MiniSparkline({ data }: { data: number[] }) {
     <svg className="sparkline" viewBox="0 0 56 20" aria-hidden="true">
       <polyline
         fill="none"
-        stroke="#F4B315"
+        stroke="#FED500"
         strokeWidth="2"
         points={points}
       />
@@ -36,22 +36,22 @@ export function KPICard({ label, value, delta, deltaLabel, sparkline, onClick, c
       type="button"
       onClick={onClick}
       className={cn(
-        "bg-white border-2 border-border rounded-xl p-5 text-left w-full",
-        "hover:border-primary hover:shadow-md transition-all focus-ring",
+        "bg-surface-1 border border-border rounded-2xl p-5 text-left w-full shadow-2xs",
+        "hover:border-border-strong transition-all focus-ring",
         className
       )}
     >
-      <div className="text-muted text-sm font-bold uppercase tracking-wide mb-2">{label}</div>
+      <div className="text-text-muted text-xs font-extrabold uppercase tracking-wide mb-2">{label}</div>
       <div className="flex items-end justify-between gap-2">
-        <span className="text-3xl font-bold tabular-nums text-black">{value}</span>
+        <span className="text-3xl font-extrabold tabular-nums text-text-primary">{value}</span>
         {sparkline && <MiniSparkline data={sparkline} />}
       </div>
       {delta !== undefined && (
-        <div className="mt-3 flex items-center gap-2 text-sm">
-          <span className={cn("tabular-nums font-bold", isPositive ? "text-green-700" : "text-red-600")}>
+        <div className="mt-3 flex items-center gap-2 text-xs">
+          <span className={cn("tabular-nums font-extrabold", isPositive ? "text-green" : "text-red")}>
             {isPositive ? "▲" : "▼"} {Math.abs(delta).toFixed(1)}%
           </span>
-          {deltaLabel && <span className="text-muted font-medium">{deltaLabel}</span>}
+          {deltaLabel && <span className="text-text-muted font-medium">{deltaLabel}</span>}
         </div>
       )}
     </button>

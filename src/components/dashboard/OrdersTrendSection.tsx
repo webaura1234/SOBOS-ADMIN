@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { formatCurrency, cn } from "@/lib/utils";
-import { StatusDot } from "@/components/ui/shared";
-import { ArrowRight, Flame, Clock } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import {
   AreaChart,
@@ -13,6 +12,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  ReferenceDot,
   ResponsiveContainer,
 } from "recharts";
 
@@ -32,12 +32,6 @@ export interface RecentOrderRow {
   createdAt: string;
 }
 
-interface OrdersTrendSectionProps {
-  hourlyBuckets: HourlyBucket[];
-  recentOrders: RecentOrderRow[];
-  loading?: boolean;
-}
-
 const SOURCE_LABELS: Record<string, string> = {
   dine_in: "Dine-In",
   takeaway: "Takeaway",
@@ -47,153 +41,255 @@ const SOURCE_LABELS: Record<string, string> = {
   counter: "Counter",
 };
 
-export function OrdersTrendSection({
-  hourlyBuckets,
-  recentOrders,
-  loading = false,
-}: OrdersTrendSectionProps) {
-  // Operating hours (11 AM to 11 PM)
-  const chartData = useMemo(() => {
-    return hourlyBuckets.filter((b) => b.hour >= 11 && b.hour <= 23);
-  }, [hourlyBuckets]);
+const hourLabel = (h: number) => `${h % 12 || 12} ${h >= 12 ? "PM" : "AM"}`;
 
-  // Compute peak hour string
-  const peakHourStr = useMemo(() => {
-    if (chartData.length === 0) return "11 AM–12 PM";
-    const peak = [...chartData].sort((a, b) => b.count - a.count)[0];
-    if (!peak || peak.count === 0) return "11 AM–12 PM";
-    const h = peak.hour;
-    const endH = (h + 1) % 24;
-    return `${h % 12 || 12} ${h >= 12 ? "PM" : "AM"}–${endH % 12 || 12} ${endH >= 12 ? "PM" : "AM"}`;
-  }, [chartData]);
+export function OrdersChartCard({
+  hourlyBuckets,
+  loading = false,
+}: {
+  hourlyBuckets: HourlyBucket[];
+  loading?: boolean;
+}) {
+  const [metric, setMetric] = useState<"orders" | "revenue">("orders");
+
+  const chartData = useMemo(
+    () => hourlyBuckets.filter((b) => b.hour >= 11 && b.hour <= 23),
+    [hourlyBuckets]
+  );
+
+  const peak = useMemo(() => {
+    if (chartData.length === 0) return null;
+    const key = metric === "orders" ? "count" : "revenue";
+    const top = [...chartData].sort((a, b) => ((b as any)[key] ?? 0) - ((a as any)[key] ?? 0))[0];
+    if (!top || (top as any)[key] === 0) return null;
+    return top;
+  }, [chartData, metric]);
+
+  const insight = useMemo(() => {
+    if (chartData.every((b) => b.count === 0)) {
+      return "Pre-service state · No live orders recorded yet today.";
+    }
+    if (!peak || chartData.length === 0) return null;
+    if (metric === "orders") {
+      const total = chartData.reduce((s, b) => s + b.count, 0);
+      const avg = total / chartData.length;
+      return `Peak ${hourLabel(peak.hour)}–${hourLabel((peak.hour + 1) % 24)} · ${peak.count} orders · avg ${avg.toFixed(1)}/hr`;
+    }
+    const total = chartData.reduce((s, b) => s + (b.revenue ?? 0), 0);
+    const share = total > 0 ? Math.round(((peak.revenue ?? 0) / total) * 100) : 0;
+    return `Peak ${hourLabel(peak.hour)}–${hourLabel((peak.hour + 1) % 24)} · ${formatCurrency(peak.revenue ?? 0)} · ${share}% of today`;
+  }, [peak, chartData, metric]);
+
+  const dataKey = metric === "orders" ? "count" : "revenue";
 
   return (
-    <div className="mb-6 space-y-2">
-      <div className="text-[11px] font-extrabold uppercase tracking-wider text-muted">
-        Orders &amp; Activity
+    <section className="h-full rounded-[14px] border border-border bg-surface-1 flex flex-col overflow-hidden" aria-label="Order activity">
+      <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
+        <h2 className="text-[16px] font-semibold leading-6 text-text-primary">Order activity</h2>
+
+        <div className="flex items-center gap-0.5 p-0.5 rounded-[10px] bg-surface-2 border border-border" role="tablist">
+          {(["orders", "revenue"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="tab"
+              aria-selected={metric === m}
+              onClick={() => setMetric(m)}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[12px] font-semibold capitalize transition-colors focus-ring",
+                metric === m
+                  ? "bg-yellow text-[var(--on-yellow)]"
+                  : "text-text-muted hover:text-text-primary"
+              )}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* 70/30 Desktop Layout: 8 columns Chart + 4 columns Recent Orders Feed */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* LEFT 8 COLS: ORDERS PER HOUR VISUALIZATION */}
-        <div className="lg:col-span-8 p-5 rounded-2xl bg-white border border-border/80 shadow-2xs space-y-4 flex flex-col justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3">
-            <div>
-              <h3 className="font-bold text-base text-black flex items-center gap-2">
-                <Clock size={18} className="text-yellow-hover" />
-                <span>Orders per Hour</span>
-              </h3>
-              <p className="text-xs text-muted font-medium mt-0.5">
-                Today's order activity across operating hours
-              </p>
-            </div>
+      {loading ? (
+        <div className="mx-4 mb-4 h-[165px] rounded-md bg-surface-3" />
+      ) : (
+        <div className="h-[165px] w-full px-2">
+          <ResponsiveContainer width="100%" height="100%" minHeight={140}>
+            <AreaChart data={chartData} margin={{ top: 8, right: 14, left: -12, bottom: 0 }}>
+              <defs>
+                <linearGradient id="sobosTrendFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FED500" stopOpacity={0.18} />
+                  <stop offset="100%" stopColor="#FED500" stopOpacity={0.00} />
+                </linearGradient>
+              </defs>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cream border border-border text-xs font-bold text-black shadow-2xs">
-              <Flame size={14} className="text-yellow-hover" />
-              <span>Peak period · {peakHourStr}</span>
-            </div>
-          </div>
+              {/* Three horizontal rules only */}
+              <CartesianGrid stroke="#1F1F1F" vertical={false} horizontalPoints={undefined} strokeDasharray="0" />
 
-          {/* Compact visual chart surface without dead space */}
-          <div className="h-[220px] w-full pt-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 12, right: 12, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="dashOrdersGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#F4B315" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#F4B315" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8DFC8" vertical={false} />
-                <XAxis
-                  dataKey="hour"
-                  tickFormatter={(h) => `${h % 12 || 12} ${h >= 12 ? "PM" : "AM"}`}
-                  tick={{ fontSize: 11, fill: "#8B7355" }}
-                  dy={4}
+              <XAxis
+                dataKey="hour"
+                ticks={[11, 14, 17, 20, 23]}
+                tickFormatter={hourLabel}
+                tick={{ fontSize: 12, fill: "#B8AA96" }}
+                tickLine={false}
+                axisLine={{ stroke: "#1F1F1F" }}
+                dy={6}
+              />
+              <YAxis
+                domain={metric === "orders" ? [0, 12] : undefined}
+                ticks={metric === "orders" ? [0, 6, 12] : undefined}
+                tick={{ fontSize: 12, fill: "#B8AA96" }}
+                tickLine={false}
+                axisLine={false}
+                width={36}
+                tickFormatter={(v) => (metric === "revenue" ? formatCurrency(v) : String(v))}
+              />
+              <Tooltip
+                cursor={{ stroke: "#2A2A2A" }}
+                contentStyle={{
+                  backgroundColor: "#101010",
+                  borderRadius: "10px",
+                  border: "1px solid #2A2A2A",
+                  color: "#F5F1E8",
+                  fontSize: "13px",
+                }}
+                labelStyle={{ color: "#B8AA96" }}
+                formatter={(val: any) => [
+                  metric === "revenue" ? formatCurrency(Number(val)) : `${val} orders`,
+                  metric === "revenue" ? "Revenue" : "Orders",
+                ]}
+                labelFormatter={(h) => hourLabel(Number(h))}
+              />
+              <Area
+                type="monotone"
+                dataKey={dataKey}
+                stroke="#FED500"
+                strokeWidth={2}
+                fill="url(#sobosTrendFill)"
+                dot={false}
+                activeDot={{ r: 4, fill: "#FED500", stroke: "#0A0A0A", strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+              {peak && (
+                <ReferenceDot
+                  x={peak.hour}
+                  y={(peak as any)[dataKey] ?? 0}
+                  r={4}
+                  fill="#FED500"
+                  stroke="#0A0A0A"
+                  strokeWidth={2}
+                  label={{ value: "Peak", position: "right", fill: "#B8AA96", fontSize: 11, dx: 4, dy: -2 }}
                 />
-                <YAxis
-                  allowDecimals={false}
-                  domain={[0, 12]}
-                  ticks={[0, 3, 6, 9, 12]}
-                  tick={{ fontSize: 11, fill: "#8B7355" }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#1A141A",
-                    borderRadius: "12px",
-                    border: "none",
-                    color: "#fff",
-                    fontSize: "12px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                  }}
-                  formatter={(val: any, name: any, item: any) => [
-                    `${val} orders (${formatCurrency(item.payload.revenue || val * 850)})`,
-                    "Orders",
-                  ]}
-                  labelFormatter={(h) => `${h % 12 || 12}:00 ${h >= 12 ? "PM" : "AM"}`}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke="#F4B315"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#dashOrdersGrad)"
-                  dot={{ r: 3.5, fill: "#F4B315", stroke: "#1A141A", strokeWidth: 1.5 }}
-                  activeDot={{ r: 6, fill: "#F4B315", stroke: "#1A141A", strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
+      )}
 
-        {/* RIGHT 4 COLS: RECENT ORDERS LIVE FEED */}
-        <div className="lg:col-span-4 p-5 rounded-2xl bg-white border border-border/80 shadow-2xs space-y-3 flex flex-col">
-          <div className="flex items-center justify-between border-b border-border/40 pb-3">
-            <h3 className="font-bold text-base text-black">Recent Orders</h3>
-            <Link
-              href="/orders"
-              className="text-xs font-bold text-black hover:text-yellow-hover flex items-center gap-1 transition-colors"
-            >
-              <span>View all</span>
-              <ArrowRight size={13} />
-            </Link>
-          </div>
+      {insight && !loading && (
+        <p className="px-4 py-3 text-[12px] leading-4 text-text-muted border-t border-border/70">
+          {insight}
+        </p>
+      )}
+    </section>
+  );
+}
 
-          <div className="flex-1 divide-y divide-border/50 overflow-y-auto scrollbar-thin max-h-[250px]">
-            {recentOrders.map((o) => (
+/** Problems before routine work: cancelled → pending → preparing → ready → done. */
+const STATUS_PRIORITY: Record<string, number> = {
+  cancelled: 0,
+  pending: 1,
+  confirmed: 1,
+  preparing: 2,
+  ready: 3,
+  served: 4,
+  done: 4,
+};
+
+const STATUS_TONE: Record<string, string> = {
+  cancelled: "var(--critical)",
+  pending: "var(--warning)",
+  confirmed: "var(--warning)",
+  preparing: "var(--warning)",
+  ready: "var(--success)",
+  served: "var(--text-muted)",
+  done: "var(--text-muted)",
+};
+
+export function RecentOrdersCard({
+  recentOrders,
+  loading = false,
+}: {
+  recentOrders: RecentOrderRow[];
+  loading?: boolean;
+}) {
+  const sorted = useMemo(
+    () =>
+      [...recentOrders].sort((a, b) => {
+        const rank = (s: string) => STATUS_PRIORITY[s] ?? 5;
+        if (rank(a.status) !== rank(b.status)) return rank(a.status) - rank(b.status);
+        // within a severity band, oldest first — it has been waiting longest
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }),
+    [recentOrders]
+  );
+
+  return (
+    <section className="h-full rounded-[14px] border border-border bg-surface-1 flex flex-col overflow-hidden" aria-label="Orders needing action">
+      <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
+        <h2 className="text-[16px] font-semibold leading-6 text-text-primary">Recent Orders</h2>
+        <Link
+          href="/orders"
+          className="inline-flex items-center gap-1 text-[12px] font-semibold text-text-secondary hover:text-yellow transition-colors focus-ring rounded"
+        >
+          View all
+          <ArrowRight size={13} />
+        </Link>
+      </div>
+
+      <div className="flex-1 px-4 pb-3">
+        {loading
+          ? [0, 1, 2, 3].map((i) => <div key={i} className="h-11 my-2 rounded-md bg-surface-3" />)
+          : sorted.slice(0, 5).map((o) => (
               <Link
                 key={o.id}
                 href={`/orders?open=${o.id}`}
-                className="group flex items-start justify-between py-2.5 px-1 hover:bg-cream/40 rounded-xl transition-all focus-ring"
+                className="group flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-[10px] border-t border-border/60 first:border-t-0 hover:bg-surface-3 transition-colors focus-ring"
               >
-                <div className="space-y-0.5 min-w-0">
-                  <div className="flex items-center gap-1.5 font-bold text-xs text-black group-hover:text-yellow-hover transition-colors">
-                    <span className="w-1.5 h-1.5 rounded-full bg-yellow shrink-0" />
-                    <span className="truncate">{o.number}</span>
-                  </div>
-                  <div className="text-[11px] text-muted font-medium pl-3">
-                    {SOURCE_LABELS[o.source] ?? o.tableLabel ?? o.source} · {format(new Date(o.createdAt), "HH:mm")}
-                  </div>
-                </div>
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: STATUS_TONE[o.status] ?? "var(--text-muted)" }}
+                  aria-hidden="true"
+                />
 
-                <div className="text-right shrink-0 space-y-1">
-                  <div className="font-extrabold text-xs text-black tabular-nums">
-                    {formatCurrency(o.total)}
-                  </div>
-                  <StatusDot status={o.status} />
-                </div>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] leading-5 text-text-primary group-hover:text-yellow transition-colors truncate">
+                    {o.number}
+                  </span>
+                  <span className="block text-[12px] leading-4 text-text-muted truncate">
+                    {SOURCE_LABELS[o.source] ?? o.tableLabel ?? o.source} · {format(new Date(o.createdAt), "HH:mm")}
+                  </span>
+                </span>
+
+                <span className="text-[14px] font-semibold tabular-nums text-text-primary shrink-0">
+                  {formatCurrency(o.total)}
+                </span>
+
+                <span
+                  className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] px-2 py-0.5 rounded-md border capitalize"
+                  style={{
+                    color: STATUS_TONE[o.status] ?? "var(--text-muted)",
+                    borderColor: "var(--border)",
+                    backgroundColor: "var(--surface-2)",
+                  }}
+                >
+                  {o.status}
+                </span>
               </Link>
             ))}
 
-            {recentOrders.length === 0 && (
-              <div className="py-12 text-center text-xs font-semibold text-muted">
-                No recent orders placed yet.
-              </div>
-            )}
-          </div>
-        </div>
+        {!loading && sorted.length === 0 && (
+          <p className="py-8 text-center text-[13px] text-text-muted">No orders yet today.</p>
+        )}
       </div>
-    </div>
+    </section>
   );
 }

@@ -50,12 +50,12 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
 };
 
 const CHANNEL_COLORS: Record<string, string> = {
-  dine_in: "#F4B315",
-  takeaway: "#D3AF85",
-  swiggy: "#8B7355",
-  zomato: "#C44B4B",
-  qr: "#D3AF85",
-  counter: "#1A141A",
+  dine_in: "#FED500",
+  takeaway: "#B8AA96",
+  swiggy: "#F59A23",
+  zomato: "#FF4D57",
+  qr: "#9B7BFF",
+  counter: "#8C8070",
 };
 
 export function SalesChannelsView({
@@ -98,20 +98,20 @@ export function SalesChannelsView({
     <div className={cn("space-y-6 transition-opacity", loading && "opacity-60")}>
       {/* COMPARISON BAR IF ACTIVE */}
       {comparison && (
-        <div className="p-4 rounded-2xl bg-gradient-to-r from-cream via-cream/50 to-white border border-border/80 flex flex-wrap items-center justify-between gap-6 shadow-2xs">
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-[var(--yellow-surface)] via-surface-1 to-surface-2 border border-[var(--border-yellow)] flex flex-wrap items-center justify-between gap-6 shadow-2xs">
           <div>
-            <div className="text-xs font-bold text-muted uppercase tracking-wider">
+            <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
               Revenue Comparison
             </div>
-            <div className="text-2xl font-extrabold text-black tabular-nums">
+            <div className="text-2xl font-extrabold text-text-primary tabular-nums">
               {formatCurrency(comparison.current.revenue)}
             </div>
             <div
               className={cn(
                 "text-xs font-extrabold flex items-center gap-1 mt-0.5",
                 comparison.current.revenue >= comparison.previous.revenue
-                  ? "text-black"
-                  : "text-red-600"
+                  ? "text-green"
+                  : "text-red"
               )}
             >
               <span>
@@ -127,7 +127,7 @@ export function SalesChannelsView({
                   : 0}
                 %
               </span>
-              <span className="text-muted font-normal">
+              <span className="text-text-muted font-normal">
                 vs {formatCurrency(comparison.previous.revenue)} prior
               </span>
             </div>
@@ -136,18 +136,18 @@ export function SalesChannelsView({
           <div className="w-px h-10 bg-border hidden sm:block" />
 
           <div>
-            <div className="text-xs font-bold text-muted uppercase tracking-wider">
+            <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
               Order Volume Comparison
             </div>
-            <div className="text-2xl font-extrabold text-black tabular-nums">
+            <div className="text-2xl font-extrabold text-text-primary tabular-nums">
               {comparison.current.orders} orders
             </div>
             <div
               className={cn(
                 "text-xs font-extrabold flex items-center gap-1 mt-0.5",
                 comparison.current.orders >= comparison.previous.orders
-                  ? "text-black"
-                  : "text-red-600"
+                  ? "text-green"
+                  : "text-red"
               )}
             >
               <span>
@@ -173,46 +173,46 @@ export function SalesChannelsView({
 
       {/* SUMMARY KPIS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
             Total Sales Revenue
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums mt-1">
+          <div className="text-2xl sm:text-3xl font-extrabold text-text-primary tabular-nums mt-1">
             {formatCurrency(totalRevenue)}
           </div>
-          <div className="text-xs font-semibold text-sand-dark mt-1">↑ Across all channels</div>
+          <div className="text-xs font-semibold text-text-secondary mt-1">↑ Across all channels</div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
             Total Orders
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums mt-1">
+          <div className="text-2xl sm:text-3xl font-extrabold text-text-primary tabular-nums mt-1">
             {totalOrders.toLocaleString()}
           </div>
-          <div className="text-xs font-semibold text-sand-dark mt-1">Fulfilled orders</div>
+          <div className="text-xs font-semibold text-text-secondary mt-1">Fulfilled orders</div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
             Top Channel
           </div>
-          <div className="text-xl font-bold text-black truncate mt-1">
+          <div className="text-xl font-bold text-text-primary truncate mt-1">
             {topChannel ? SOURCE_LABELS[topChannel.source] ?? topChannel.source : "—"}
           </div>
-          <div className="text-xs font-semibold text-black mt-1">
+          <div className="text-xs font-semibold text-text-primary mt-1">
             {topChannel ? formatCurrency(topChannel._sum.total ?? 0) : "—"}
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider">
             Active Channels
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums mt-1">
+          <div className="text-2xl sm:text-3xl font-extrabold text-text-primary tabular-nums mt-1">
             {paymentData.length}
           </div>
-          <div className="text-xs font-semibold text-muted mt-1">Integrated sources</div>
+          <div className="text-xs font-semibold text-text-muted mt-1">Integrated sources</div>
         </div>
       </div>
 
@@ -227,10 +227,10 @@ export function SalesChannelsView({
       {/* MAIN VISUALIZATION: CHANNEL BREAKDOWN WITH HORIZONTAL BARS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Horizontal proportion bars (6 cols) */}
-        <div className="lg:col-span-6 p-5 rounded-2xl bg-white border border-border/80 shadow-2xs space-y-4">
+        <div className="lg:col-span-6 p-5 rounded-2xl bg-surface-1 border border-border shadow-2xs space-y-4">
           <div>
-            <h3 className="font-bold text-base text-black">Channel Revenue Breakdown</h3>
-            <p className="text-xs text-muted font-medium mt-0.5">
+            <h3 className="font-bold text-base text-text-primary">Channel Revenue Breakdown</h3>
+            <p className="text-xs text-text-muted font-medium mt-0.5">
               Proportional distribution by sales source
             </p>
           </div>
@@ -239,31 +239,31 @@ export function SalesChannelsView({
             {sortedChannels.map((c) => {
               const rev = c._sum.total ?? 0;
               const share = totalRevenue > 0 ? Math.round((rev / totalRevenue) * 100) : 0;
-              const color = CHANNEL_COLORS[c.source] ?? "#F4B315";
+              const color = CHANNEL_COLORS[c.source] ?? "#FED500";
               const label = SOURCE_LABELS[c.source] ?? c.source;
               const icon = CHANNEL_ICONS[c.source] ?? <Store size={18} />;
 
               return (
-                <div key={c.source} className="p-3.5 rounded-xl border border-border/60 bg-cream/20 space-y-2">
+                <div key={c.source} className="p-3.5 rounded-xl border border-border bg-surface-2 space-y-2">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 font-bold text-sm text-black">
-                      <span className="p-1.5 rounded-lg bg-white shadow-2xs">{icon}</span>
+                    <div className="flex items-center gap-2 font-bold text-sm text-text-primary">
+                      <span className="p-1.5 rounded-lg bg-surface-3 border border-border">{icon}</span>
                       <span>{label}</span>
                     </div>
                     <div className="text-right tabular-nums">
-                      <span className="font-extrabold text-sm text-black">{formatCurrency(rev)}</span>
-                      <span className="text-xs text-muted ml-2 font-bold">({share}%)</span>
+                      <span className="font-extrabold text-sm text-text-primary">{formatCurrency(rev)}</span>
+                      <span className="text-xs text-text-muted ml-2 font-bold">({share}%)</span>
                     </div>
                   </div>
 
-                  <div className="h-2.5 rounded-full bg-cream border border-border/50 overflow-hidden">
+                  <div className="h-2.5 rounded-full bg-surface-3 border border-border overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${share}%`, backgroundColor: color }}
                     />
                   </div>
 
-                  <div className="text-[11px] font-semibold text-muted text-right">
+                  <div className="text-[11px] font-semibold text-text-muted text-right">
                     {c._count} orders completed
                   </div>
                 </div>
@@ -273,10 +273,10 @@ export function SalesChannelsView({
         </div>
 
         {/* Channel Trend over time Area Chart (6 cols) */}
-        <div className="lg:col-span-6 p-5 rounded-2xl bg-white border border-border/80 shadow-2xs space-y-4">
+        <div className="lg:col-span-6 p-5 rounded-2xl bg-surface-1 border border-border shadow-2xs space-y-4">
           <div>
-            <h3 className="font-bold text-base text-black">Channel Trend Over Time</h3>
-            <p className="text-xs text-muted font-medium mt-0.5">
+            <h3 className="font-bold text-base text-text-primary">Channel Trend Over Time</h3>
+            <p className="text-xs text-text-muted font-medium mt-0.5">
               Daily revenue trajectory across order channels
             </p>
           </div>
@@ -284,11 +284,11 @@ export function SalesChannelsView({
           <div className="h-[300px] w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={channelTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8DFC8" />
-                <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#8B7355" }} />
-                <YAxis tick={{ fontSize: 11, fill: "#8B7355" }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" />
+                <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#B8AA96" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#B8AA96" }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: "#1A141A", borderRadius: "12px", color: "#fff", fontSize: "12px" }}
+                  contentStyle={{ backgroundColor: "#101010", borderRadius: "12px", border: "1px solid #2A2A2A", color: "#F5F1E8", fontSize: "12px" }}
                   formatter={(val: any, name: any) => [formatCurrency(Number(val)), SOURCE_LABELS[String(name)] ?? name]}
                 />
                 {sortedChannels.map((c) => (
@@ -297,8 +297,8 @@ export function SalesChannelsView({
                     type="monotone"
                     dataKey={c.source}
                     stackId="1"
-                    stroke={CHANNEL_COLORS[c.source] ?? "#F4B315"}
-                    fill={CHANNEL_COLORS[c.source] ?? "#F4B315"}
+                    stroke={CHANNEL_COLORS[c.source] ?? "#FED500"}
+                    fill={CHANNEL_COLORS[c.source] ?? "#FED500"}
                     fillOpacity={0.6}
                   />
                 ))}

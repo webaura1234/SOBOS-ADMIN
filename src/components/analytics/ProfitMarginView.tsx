@@ -35,15 +35,53 @@ function MarginBar({ value }: { value: number }) {
   const pct = Math.min(100, Math.max(0, value));
   return (
     <div className="flex items-center gap-2.5 min-w-[140px]">
-      <div className="flex-1 h-3 rounded-full bg-cream-dark/60 border border-border/80 overflow-hidden p-0.5 shadow-2xs">
+      <div className="flex-1 h-3 rounded-full bg-surface-2 border border-border overflow-hidden p-0.5">
         <div
           className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, backgroundColor: "var(--yellow, #F4B315)" }}
+          style={{ width: `${pct}%`, backgroundColor: "#FED500" }}
         />
       </div>
-      <span className="text-xs font-extrabold tabular-nums w-12 text-right text-black">
+      <span className="text-xs font-extrabold tabular-nums w-12 text-right text-text-primary">
         {value.toFixed(1)}%
       </span>
+    </div>
+  );
+}
+
+interface MatrixTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      name: string;
+      x: number;
+      y: number;
+      profitPerUnit: number;
+      quadName: string;
+    };
+  }>;
+}
+
+function MatrixTooltip({ active, payload }: MatrixTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const data = payload[0].payload;
+  return (
+    <div className="bg-surface-2 text-text-primary p-3 rounded-xl shadow-xl text-xs space-y-1 border border-border border-strong z-50">
+      <div className="font-extrabold text-yellow text-sm">{data.name}</div>
+      <div className="flex justify-between gap-4 pt-1">
+        <span className="text-text-muted font-semibold">Gross Margin:</span>
+        <span className="font-bold tabular-nums text-text-primary">{data.y}%</span>
+      </div>
+      <div className="flex justify-between gap-4">
+        <span className="text-text-muted font-semibold">Sales Volume:</span>
+        <span className="font-bold tabular-nums text-text-primary">{data.x} units</span>
+      </div>
+      <div className="flex justify-between gap-4">
+        <span className="text-text-muted font-semibold">Profit / Unit:</span>
+        <span className="font-bold tabular-nums text-yellow">{formatCurrency(data.profitPerUnit)}</span>
+      </div>
+      <div className="mt-2 pt-1 border-t border-border text-[10px] font-extrabold uppercase tracking-wider text-text-secondary">
+        Category: <span className="text-text-primary">{data.quadName}</span>
+      </div>
     </div>
   );
 }
@@ -129,7 +167,7 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
       header: "#",
       width: "48px",
       render: (_, idx) => (
-        <span className="font-bold text-xs text-muted tabular-nums">{idx + 1}</span>
+        <span className="font-bold text-xs text-text-muted tabular-nums">{idx + 1}</span>
       ),
     },
     {
@@ -137,8 +175,8 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
       header: "Menu Item",
       render: (r) => (
         <div>
-          <div className="font-bold text-black">{r.name}</div>
-          <div className="text-[11px] text-muted font-medium">Cost: {formatCurrency(r.recipeCost)}</div>
+          <div className="font-bold text-text-primary">{r.name}</div>
+          <div className="text-[11px] text-text-muted font-medium">Cost: {formatCurrency(r.recipeCost)}</div>
         </div>
       ),
     },
@@ -146,7 +184,7 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
       key: "basePrice",
       header: "Selling Price",
       align: "right",
-      render: (r) => <span className="font-bold text-black">{formatCurrency(r.basePrice)}</span>,
+      render: (r) => <span className="font-bold text-text-primary">{formatCurrency(r.basePrice)}</span>,
     },
     {
       key: "grossMargin",
@@ -159,7 +197,7 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
       header: "Profit / Unit",
       align: "right",
       render: (r) => (
-        <span className="tabular-nums font-extrabold text-black">
+        <span className="tabular-nums font-extrabold text-text-primary">
           {formatCurrency(r.basePrice - r.recipeCost)}
         </span>
       ),
@@ -168,7 +206,7 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
       key: "unitsSold",
       header: "Units Sold",
       align: "right",
-      render: (r) => <span className="tabular-nums font-bold text-black">{r.unitsSold}</span>,
+      render: (r) => <span className="tabular-nums font-bold text-text-primary">{r.unitsSold}</span>,
     },
   ];
 
@@ -176,61 +214,61 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
     <div className={cn("space-y-6 transition-opacity", loading && "opacity-60")}>
       {/* SECTION 1 — Profitability Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider mb-1">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">
             Avg Margin
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-text-primary tabular-nums">
             {stats ? `${stats.avgMargin.toFixed(1)}%` : "—"}
           </div>
-          <div className="flex items-center gap-1 mt-1.5 text-xs font-bold text-black">
+          <div className="flex items-center gap-1 mt-1.5 text-xs font-bold text-green">
             <span>↑ 2.1%</span>
-            <span className="text-muted font-normal">vs previous period</span>
+            <span className="text-text-muted font-normal">vs previous period</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider mb-1">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">
             Best Margin
           </div>
-          <div className="text-lg font-bold text-black truncate">
+          <div className="text-lg font-bold text-text-primary truncate">
             {stats?.best ? stats.best.name : "—"}
           </div>
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-black">
-            <span className="px-2 py-0.5 rounded-md bg-yellow/30 text-black font-extrabold border border-yellow/50">
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-text-primary">
+            <span className="px-2 py-0.5 rounded-md bg-yellow text-[var(--on-yellow)] font-extrabold">
               {stats?.best ? `${stats.best.grossMargin.toFixed(1)}%` : "—"}
             </span>
-            <span className="text-muted font-medium">
+            <span className="text-text-muted font-medium">
               {stats?.best ? formatCurrency(stats.best.basePrice) : ""}
             </span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider mb-1">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">
             Needs Review
           </div>
-          <div className="text-lg font-bold text-black truncate">
+          <div className="text-lg font-bold text-text-primary truncate">
             {stats?.worst ? stats.worst.name : "—"}
           </div>
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-black">
-            <span className="px-2 py-0.5 rounded-md bg-cream border border-border text-black font-extrabold">
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-bold text-text-primary">
+            <span className="px-2 py-0.5 rounded-md bg-surface-2 border border-border text-text-primary font-extrabold">
               {stats?.worst ? `${stats.worst.grossMargin.toFixed(1)}% margin` : "—"}
             </span>
-            <span className="text-muted font-medium">Low margin</span>
+            <span className="text-text-muted font-medium">Low margin</span>
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white border border-border/80 shadow-2xs hover:shadow-xs transition-shadow">
-          <div className="text-xs font-bold text-muted uppercase tracking-wider mb-1">
+        <div className="p-4 rounded-2xl bg-surface-1 border border-border shadow-2xs">
+          <div className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">
             Units Sold
           </div>
-          <div className="text-2xl sm:text-3xl font-extrabold text-black tabular-nums">
+          <div className="text-2xl sm:text-3xl font-extrabold text-text-primary tabular-nums">
             {stats ? stats.totalSold.toLocaleString() : "—"}
           </div>
-          <div className="flex items-center gap-1 mt-1.5 text-xs font-bold text-black">
+          <div className="flex items-center gap-1 mt-1.5 text-xs font-bold text-green">
             <span>↑ 8.2%</span>
-            <span className="text-muted font-normal">menu volume</span>
+            <span className="text-text-muted font-normal">menu volume</span>
           </div>
         </div>
       </div>
@@ -245,11 +283,11 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
 
       {/* SECTION 2 & 3 — Grid layout: Margin Distribution (Horizontal Bars) + Profitability Matrix */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* SECTION 2: Horizontal Margin Distribution (5 cols) — SOBOS Yellow Primary Accent */}
-        <div className="lg:col-span-5 p-5 rounded-2xl bg-white border border-border/80 shadow-2xs space-y-4">
+        {/* SECTION 2: Horizontal Margin Distribution (5 cols) */}
+        <div className="lg:col-span-5 p-5 rounded-2xl bg-surface-1 border border-border shadow-2xs space-y-4">
           <div>
-            <h3 className="font-bold text-base text-black">Margin Distribution</h3>
-            <p className="text-xs text-muted font-medium mt-0.5">
+            <h3 className="font-bold text-base text-text-primary">Margin Distribution</h3>
+            <p className="text-xs text-text-muted font-medium mt-0.5">
               High to low profitability menu ranking
             </p>
           </div>
@@ -257,18 +295,18 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
           <div className="space-y-3.5 pt-1">
             {distributionItems.map((item) => (
               <div key={item.id} className="space-y-1.5">
-                <div className="flex justify-between items-center text-xs font-bold text-black">
+                <div className="flex justify-between items-center text-xs font-bold text-text-primary">
                   <span className="truncate pr-2">{item.name}</span>
-                  <span className="tabular-nums font-extrabold text-black shrink-0">
+                  <span className="tabular-nums font-extrabold text-text-primary shrink-0">
                     {item.grossMargin.toFixed(1)}%
                   </span>
                 </div>
-                <div className="h-3 rounded-full bg-cream-dark/60 border border-border/80 overflow-hidden p-0.5 shadow-2xs">
+                <div className="h-3 rounded-full bg-surface-2 border border-border overflow-hidden p-0.5">
                   <div
-                    className="h-full rounded-full transition-all duration-500 shadow-2xs"
+                    className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${Math.min(100, Math.max(0, item.grossMargin))}%`,
-                      backgroundColor: "var(--yellow, #F4B315)",
+                      backgroundColor: "#FED500",
                     }}
                   />
                 </div>
@@ -278,11 +316,11 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
         </div>
 
         {/* SECTION 3: Profitability Matrix 2x2 Scatter Grid (7 cols) */}
-        <div className="lg:col-span-7 p-5 rounded-2xl bg-white border border-border/80 shadow-2xs space-y-3">
+        <div className="lg:col-span-7 p-5 rounded-2xl bg-surface-1 border border-border shadow-2xs space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="font-bold text-base text-black">Profitability Matrix</h3>
-              <p className="text-xs text-muted font-medium mt-0.5">
+              <h3 className="font-bold text-base text-text-primary">Profitability Matrix</h3>
+              <p className="text-xs text-text-muted font-medium mt-0.5">
                 Gross Margin % (Y) vs Sales Volume (X)
               </p>
             </div>
@@ -295,8 +333,8 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
                 className={cn(
                   "px-3 py-1 rounded-full transition-all border cursor-pointer",
                   quadFilter === "high"
-                    ? "bg-yellow text-black border-yellow-hover shadow-2xs font-extrabold"
-                    : "bg-cream/60 text-muted border-border/80 hover:text-black"
+                    ? "bg-yellow text-[var(--on-yellow)] border-yellow font-extrabold"
+                    : "bg-surface-2 text-text-secondary border-border hover:text-text-primary hover:bg-surface-3"
                 )}
               >
                 High Performers
@@ -307,8 +345,8 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
                 className={cn(
                   "px-3 py-1 rounded-full transition-all border cursor-pointer",
                   quadFilter === "review"
-                    ? "bg-amber-100 text-amber-900 border-amber-300 shadow-2xs font-extrabold"
-                    : "bg-cream/60 text-muted border-border/80 hover:text-black"
+                    ? "bg-yellow-surface text-yellow border-[var(--border-yellow)] font-extrabold"
+                    : "bg-surface-2 text-text-secondary border-border hover:text-text-primary hover:bg-surface-3"
                 )}
               >
                 Review Pricing
@@ -317,30 +355,30 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
           </div>
 
           {/* Quadrant Visual overlay container */}
-          <div className="relative w-full h-[290px] bg-cream/20 rounded-xl p-2 border border-border/40 overflow-hidden">
-            {/* Quadrant Labels (Positioned cleanly) */}
-            <div className="absolute top-3 left-4 text-[10px] font-extrabold text-muted/80 uppercase tracking-wider pointer-events-none select-none">
+          <div className="relative w-full h-[290px] bg-surface-2 rounded-xl p-2 border border-border overflow-hidden">
+            {/* Quadrant Labels */}
+            <div className="absolute top-3 left-4 text-[10px] font-extrabold text-text-muted uppercase tracking-wider pointer-events-none select-none">
               High Margin (Low Volume)
             </div>
-            <div className="absolute top-3 right-4 text-[10px] font-extrabold text-black uppercase tracking-wider pointer-events-none select-none">
+            <div className="absolute top-3 right-4 text-[10px] font-extrabold text-text-primary uppercase tracking-wider pointer-events-none select-none">
               High Performers ⭐
             </div>
-            <div className="absolute bottom-3 left-4 text-[10px] font-extrabold text-muted/70 uppercase tracking-wider pointer-events-none select-none">
+            <div className="absolute bottom-3 left-4 text-[10px] font-extrabold text-text-muted uppercase tracking-wider pointer-events-none select-none">
               Low Performers
             </div>
-            <div className="absolute bottom-3 right-4 text-[10px] font-extrabold text-sand-dark uppercase tracking-wider pointer-events-none select-none">
+            <div className="absolute bottom-3 right-4 text-[10px] font-extrabold text-text-secondary uppercase tracking-wider pointer-events-none select-none">
               Review Pricing ⚠️
             </div>
 
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={290}>
               <ScatterChart margin={{ top: 25, right: 25, bottom: 25, left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8DFC8" opacity={0.6} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1F1F1F" opacity={0.8} />
                 <XAxis
                   type="number"
                   dataKey="x"
                   name="Sales Volume"
                   unit=" units"
-                  tick={{ fontSize: 10, fill: "#8B7355", fontWeight: 600 }}
+                  tick={{ fontSize: 10, fill: "#B8AA96", fontWeight: 600 }}
                   tickFormatter={(val) => `${val} units`}
                 />
                 <YAxis
@@ -350,51 +388,39 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
                   unit="%"
                   domain={[0, 100]}
                   ticks={[0, 25, 50, 75, 100]}
-                  tick={{ fontSize: 10, fill: "#8B7355", fontWeight: 600 }}
+                  tick={{ fontSize: 10, fill: "#B8AA96", fontWeight: 600 }}
                   tickFormatter={(val) => `${val}%`}
                 />
 
                 {/* Subtle Quadrant Dividers */}
-                <ReferenceLine x={avgUnits} stroke="#D3AF85" strokeDasharray="4 4" opacity={0.7} />
-                <ReferenceLine y={60} stroke="#D3AF85" strokeDasharray="4 4" opacity={0.7} />
+                <ReferenceLine x={avgUnits} stroke="#2A2A2A" strokeDasharray="4 4" />
+                <ReferenceLine y={60} stroke="#2A2A2A" strokeDasharray="4 4" />
 
                 <Tooltip
-                  cursor={{ strokeDasharray: "3 3", stroke: "#8B7355" }}
-                  content={({ payload }) => {
-                    if (!payload || payload.length === 0) return null;
-                    const data = payload[0].payload;
-                    return (
-                      <div className="bg-black text-white p-3 rounded-xl shadow-xl text-xs space-y-1 border border-border/20 z-50">
-                        <div className="font-extrabold text-yellow text-sm">{data.name}</div>
-                        <div className="flex justify-between gap-4 pt-1">
-                          <span className="text-gray-300 font-semibold">Gross Margin:</span>
-                          <span className="font-bold tabular-nums text-white">{data.y}%</span>
-                        </div>
-                        <div className="flex justify-between gap-4">
-                          <span className="text-gray-300 font-semibold">Sales Volume:</span>
-                          <span className="font-bold tabular-nums text-white">{data.x} units</span>
-                        </div>
-                        <div className="flex justify-between gap-4">
-                          <span className="text-gray-300 font-semibold">Profit / Unit:</span>
-                          <span className="font-bold tabular-nums text-yellow-hover">{formatCurrency(data.profitPerUnit)}</span>
-                        </div>
-                        <div className="mt-2 pt-1 border-t border-gray-800 text-[10px] font-extrabold uppercase tracking-wider text-sand">
-                          Category: <span className="text-white">{data.quadName}</span>
-                        </div>
-                      </div>
-                    );
-                  }}
+                  cursor={{ strokeDasharray: "3 3", stroke: "#2A2A2A" }}
+                  content={<MatrixTooltip />}
+                  isAnimationActive={false}
                 />
 
-                <Scatter data={matrixData} fill="#F4B315">
+                {/* Hover emphasis is driven by Recharts' own active-point state (the same
+                    state that opens the tooltip) rather than a CSS transform. A CSS scale
+                    cannot be used here: Recharts positions each symbol with the SVG
+                    `transform` attribute (translate(x,y)) and a CSS scale composes outside
+                    that translate, multiplying it — the dot jumped ~39px away from the
+                    cursor, lost :hover, transitioned back, and re-hovered in a loop. */}
+                <Scatter
+                  data={matrixData}
+                  fill="#FED500"
+                  isAnimationActive={false}
+                  activeShape={{ r: quadFilter !== "all" ? 11 : 9 }}
+                >
                   {matrixData.map((entry, index) => {
-                    let fill = "#F4B315";
-                    if (entry.quadKey === "high") fill = "#F4B315";
-                    else if (entry.quadKey === "review") fill = "#E07A5F";
-                    else if (entry.quadKey === "opportunity") fill = "#8B7355";
-                    else fill = "#2E251C";
+                    let fill = "#FED500";
+                    if (entry.quadKey === "high") fill = "#FED500";
+                    else if (entry.quadKey === "review") fill = "#F59A23";
+                    else if (entry.quadKey === "opportunity") fill = "#9B7BFF";
+                    else fill = "#FF4D57";
 
-                    // Filter opacity logic
                     const matchesFilter =
                       quadFilter === "all" ||
                       (quadFilter === "high" && entry.quadKey === "high") ||
@@ -407,11 +433,11 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
                       <Cell
                         key={`cell-${index}`}
                         fill={fill}
-                        stroke="#1A141A"
+                        stroke="#0A0A0A"
                         strokeWidth={1.5}
                         r={radius}
                         opacity={opacity}
-                        className="transition-all duration-300 hover:scale-125 cursor-pointer"
+                        className="cursor-pointer"
                       />
                     );
                   })}
@@ -426,30 +452,30 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
       <div className="space-y-3 pt-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold text-base text-black">Menu Profitability Breakdown</h3>
-            <p className="text-xs text-muted font-medium mt-0.5">
-              Exact item prices, recipe costs, unit profits, and volume
+            <h3 className="font-bold text-base text-text-primary">Menu Profitability Breakdown</h3>
+            <p className="text-xs text-text-muted font-medium mt-0.5">
+              Use ↑/↓ or j/k to move, Enter to open.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <FilterBar search={search} onSearchChange={setSearch} placeholder="Search menu item..." />
-            <div className="inline-flex rounded-xl bg-white border border-border overflow-hidden p-0.5 text-xs font-bold shrink-0 shadow-2xs">
+            <div className="inline-flex rounded-xl bg-surface-1 border border-border overflow-hidden p-0.5 text-xs font-bold shrink-0 shadow-2xs">
               <button
                 onClick={() => setMarginSort("margin")}
-                className={cn("px-2.5 py-1.5 rounded-lg transition-colors", marginSort === "margin" ? "bg-yellow text-black" : "text-muted hover:text-black")}
+                className={cn("px-2.5 py-1.5 rounded-lg transition-colors", marginSort === "margin" ? "bg-yellow text-[var(--on-yellow)]" : "text-text-secondary hover:text-text-primary hover:bg-surface-3")}
               >
                 By Margin
               </button>
               <button
                 onClick={() => setMarginSort("sold")}
-                className={cn("px-2.5 py-1.5 rounded-lg transition-colors", marginSort === "sold" ? "bg-yellow text-black" : "text-muted hover:text-black")}
+                className={cn("px-2.5 py-1.5 rounded-lg transition-colors", marginSort === "sold" ? "bg-yellow text-[var(--on-yellow)]" : "text-text-secondary hover:text-text-primary hover:bg-surface-3")}
               >
                 By Sold
               </button>
               <button
                 onClick={() => setMarginSort("price")}
-                className={cn("px-2.5 py-1.5 rounded-lg transition-colors", marginSort === "price" ? "bg-yellow text-black" : "text-muted hover:text-black")}
+                className={cn("px-2.5 py-1.5 rounded-lg transition-colors", marginSort === "price" ? "bg-yellow text-[var(--on-yellow)]" : "text-text-secondary hover:text-text-primary hover:bg-surface-3")}
               >
                 By Price
               </button>
@@ -457,7 +483,7 @@ export function ProfitMarginView({ items, loading = false }: ProfitMarginViewPro
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/80 overflow-hidden bg-white shadow-2xs">
+        <div className="rounded-2xl border border-border overflow-hidden bg-surface-1 shadow-2xs">
           <DenseGrid
             columns={cols}
             data={filtered}

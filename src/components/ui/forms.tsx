@@ -43,17 +43,17 @@ export function ConfirmDialog({
   return (
     <dialog
       ref={ref}
-      className="fixed inset-0 z-[150] m-auto max-w-md w-full bg-white border-2 border-border rounded-2xl p-0 backdrop:bg-black/40"
+      className="fixed inset-0 z-[150] m-auto max-w-md w-full bg-surface-1 border border-border rounded-2xl p-0 backdrop:bg-[var(--scrim)] text-text-primary shadow-2xl"
       onClose={onCancel}
     >
       <div className="p-6">
-        <h2 className="text-lg font-bold text-black mb-2">{title}</h2>
-        <p className="text-base text-muted font-medium mb-6">{message}</p>
+        <h2 className="text-lg font-bold text-text-primary mb-2">{title}</h2>
+        <p className="text-sm text-text-muted font-medium mb-6">{message}</p>
         {requireReason && (
           <label className="block mb-6">
-            <span className="text-sm font-bold text-black block mb-2">{reasonLabel} <span className="text-red-600">*</span></span>
+            <span className="text-xs font-bold text-text-primary block mb-2">{reasonLabel} <span className="text-red">*</span></span>
             <textarea
-              className="w-full min-h-24 px-3 py-2 border-2 border-border rounded-xl text-base font-semibold bg-white focus-ring text-black"
+              className="w-full min-h-24 px-3 py-2 border border-border rounded-xl text-sm font-semibold bg-surface-2 focus-ring text-text-primary"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Add an audit reason"
@@ -70,7 +70,7 @@ export function ConfirmDialog({
               onCancel();
             }}
             disabled={requireReason && !reason.trim()}
-            className={destructive ? "btn-primary !bg-red-600 !border-red-600 !text-white disabled:opacity-50 disabled:cursor-not-allowed" : "btn-primary disabled:opacity-50 disabled:cursor-not-allowed"}
+            className={destructive ? "btn-primary !bg-red !border-red !text-white disabled:opacity-50 disabled:cursor-not-allowed" : "btn-primary disabled:opacity-50 disabled:cursor-not-allowed"}
           >
             {confirmLabel}
           </button>
@@ -90,20 +90,20 @@ interface FormFieldProps {
 export function FormField({ label, children, required, hint }: FormFieldProps) {
   return (
     <label className="block mb-5">
-      <span className="text-base font-bold text-black block mb-2">
-        {label}{required && <span className="text-red-600"> *</span>}
+      <span className="text-sm font-bold text-text-primary block mb-2">
+        {label}{required && <span className="text-red"> *</span>}
       </span>
-      {hint && <span className="text-sm font-medium text-muted block mb-2">{hint}</span>}
+      {hint && <span className="text-xs font-medium text-text-muted block mb-2">{hint}</span>}
       {children}
     </label>
   );
 }
 
 export const inputClass =
-  "w-full h-12 px-4 border-2 border-border rounded-xl text-base font-semibold bg-white focus-ring text-black";
+  "w-full h-12 px-4 border border-border rounded-xl text-sm font-semibold bg-surface-2 focus-ring text-text-primary placeholder:text-text-muted";
 
 export const selectClass =
-  "w-full h-12 px-4 border-2 border-border rounded-xl text-base font-semibold bg-white focus-ring text-black";
+  "w-full h-12 px-4 border border-border rounded-xl text-sm font-semibold bg-surface-2 focus-ring text-text-primary";
 
 export function exportCsv(filename: string, headers: string[], rows: (string | number)[][]) {
   const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
