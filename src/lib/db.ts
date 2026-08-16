@@ -216,7 +216,7 @@ class QueryBuilder {
 
   order(field: string, opts?: { ascending?: boolean }) {
     const dir = opts?.ascending === false ? "desc" : "asc";
-    let clean = field.trim();
+    const clean = field.trim();
     if (clean.includes("(") && clean.endsWith(")")) {
       const open = clean.indexOf("(");
       const head = clean.slice(0, open).trim();

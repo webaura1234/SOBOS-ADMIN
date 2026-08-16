@@ -5,7 +5,7 @@ Next.js frontend for the **Sobos** restaurant admin dashboard (Owner + Manager),
 ## Stack
 
 - **Next.js 16** (App Router, TypeScript)
-- **SQLite** (`db.sqlite` at project root)
+- **PostgreSQL / Supabase** (`DATABASE_URL` and `DIRECT_URL` in `.env.local`)
 - **Prisma ORM** for all data access
 - **Tailwind CSS** + design tokens from `_common/02_visual_system.md`
 - **Recharts** for analytics charts
@@ -26,19 +26,19 @@ Next.js frontend for the **Sobos** restaurant admin dashboard (Owner + Manager),
 ```bash
 cd restaurant_admin_ui
 npm install
-npm run db:setup    # create db.sqlite + seed demo data
+npm run db:setup    # apply the Prisma schema from .env.local
 npm run dev         # http://localhost:3000
 ```
 
 ## Database
 
-- File: `db.sqlite` (project root)
+- Database: PostgreSQL, configured through `.env.local`
 - Schema: `prisma/schema.prisma`
 - Seed: `prisma/seed.ts` (Spice Garden demo restaurant)
 
 ```bash
 npm run db:push     # apply schema
-npm run db:seed     # re-seed data
+npm run db:seed     # reset and seed demo data
 npm run db:generate # regenerate Prisma client
 ```
 
@@ -49,7 +49,6 @@ restaurant_admin_ui/
 ├── prisma/
 │   ├── schema.prisma    # full data model
 │   ├── seed.ts          # demo seed
-│   └── db.sqlite        # SQLite database (project root)
 ├── src/
 │   ├── app/
 │   │   ├── (admin)/     # all module pages
